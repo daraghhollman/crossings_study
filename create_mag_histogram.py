@@ -10,6 +10,7 @@ from glob import glob
 import hermpy.boundary_crossings as boundaries
 import hermpy.mag as mag
 import hermpy.plotting_tools as plotting
+import hermpy.trajectory as trajectory
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -66,11 +67,22 @@ data = mag.Adjust_For_Aberration(data)
 
 # STEP THREE: PLOTTING TIME SERIES
 
-fig, axes = plt.subplots(2, 1, sharex=True)
+fig = plt.figure()
+
+# Make trajectory axes
+ax1 = plt.subplot2grid((4, 2), (0, 0), colspan=1, rowspan=2)
+ax2 = plt.subplot2grid((4, 2), (0, 1), colspan=1, rowspan=2)
+trajectory_axes = [ax1, ax2]
+
+ax3 = plt.subplot2grid((4, 2), (2, 0), colspan=2)
+ax4 = plt.subplot2grid((4, 2), (3, 0), colspan=2)
+mag_axes = [ax3, ax4]
+
+
+# Plot MAG
 to_plot = ["mag_x", "mag_total"]
 y_labels = ["B$_x$", "|B|"]
-
-for i, ax in enumerate(axes):
+for i, ax in enumerate(mag_axes):
 
     ax.plot(data["date"], data[to_plot[i]], color="black", lw=0.8)
     ax.set_ylabel(y_labels[i])
@@ -87,7 +99,68 @@ for i, ax in enumerate(axes):
 
 # Add ephemeris
 plotting.Add_Tick_Ephemeris(
-    axes[-1], metakernel, include={"date", "hours", "minutes", "range", "local time"}
+    mag_axes[-1],
+    metakernel,
+    include={"date", "hours", "minutes", "range", "local time"},
+)
+
+
+# Get trajectory data from spice
+time_padding = dt.timedelta(hours=6)
+spice_dates = [
+    start_time.strftime("%Y-%m-%d %H:%M:%S"),
+    end_time.strftime("%Y-%m-%d %H:%M:%S"),
+]
+
+padded_dates = [
+    (start_time - time_padding).strftime("%Y-%m-%d %H:%M:%S"),
+    (end_time + time_padding).strftime("%Y-%m-%d %H:%M:%S"),
+]
+
+frame = "MSM"
+
+# Get positions in MSO coordinate system
+positions = trajectory.Get_Trajectory(
+    "Messenger", spice_dates, metakernel, frame=frame, aberrate=True
+)
+padded_positions = trajectory.Get_Trajectory(
+    "Messenger", padded_dates, metakernel, frame=frame, aberrate=True
+)
+
+# Convert from km to Mercury radii
+positions /= 2439.7
+padded_positions /= 2439.7
+
+trajectory_axes[0].plot(
+    positions[:, 0], positions[:, 1], color="magenta", lw=3, zorder=10
+)
+trajectory_axes[1].plot(
+    positions[:, 0],
+    positions[:, 2],
+    color="magenta",
+    lw=3,
+    zorder=10,
+    label="Plotted Trajectory",
+)
+
+# We also would like to give context and plot the orbit around this
+trajectory_axes[0].plot(padded_positions[:, 0], padded_positions[:, 1], color="grey")
+trajectory_axes[1].plot(
+    padded_positions[:, 0],
+    padded_positions[:, 2],
+    color="grey",
+    label=r"Trajectory $\pm$ 6 hours",
+)
+
+planes = ["xy", "xz"]
+for i, ax in enumerate(trajectory_axes):
+    plotting.Plot_Mercury(ax, shaded_hemisphere="left", plane=planes[i], frame=frame)
+    plotting.AddLabels(ax, planes[i], frame=frame, aberrate=True)
+    plotting.PlotMagnetosphericBoundaries(ax, plane=planes[i], add_legend=True)
+    plotting.SquareAxes(ax, 4)
+
+trajectory_axes[1].legend(
+    bbox_to_anchor=(0.5, 1.2), loc="center", ncol=2, borderaxespad=0.5
 )
 
 plt.show()
@@ -100,7 +173,11 @@ fig, ax = plt.subplots()
 binsize = 1
 bins = np.arange(np.min(data["mag_x"]), np.max(data["mag_x"]), binsize)
 hist_data, bin_edges, _ = ax.hist(
-    data["mag_x"], bins=bins, density=True, color="cornflowerblue"
+    data["mag_x"],
+    bins=bins,
+    density=True,
+    color="cornflowerblue",
+    label=f"{start_time.strftime('%Y-%M-%d %H:%M')} to {start_time.strftime('%Y-%M-%d %H:%M')}",
 )
 
 bin_centres = bin_edges[:-1] + np.diff(bin_edges) / 2
@@ -118,8 +195,6 @@ pars, cov = curve_fit(
     Double_Gaussian, bin_centres, hist_data, [0.01, -20, 10, 0.01, 20, 10]
 )
 
-# ax.plot(bin_centres, Double_Gaussian(bin_centres, 0.01, -20, 10, 0.01, 20, 10))
-
 ax.plot(
     bins,
     Double_Gaussian(
@@ -133,10 +208,12 @@ ax.plot(
     ),
     color="indianred",
     lw=3,
+    label="Double Gaussian Fit",
 )
 
 
 ax.set_ylabel("Probability Density of Measurements")
 ax.set_xlabel(r"B$_x$ " + f" (binsize {binsize} nT)")
 
+plt.legend()
 plt.show()

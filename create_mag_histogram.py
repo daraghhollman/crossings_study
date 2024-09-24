@@ -211,6 +211,8 @@ ax.plot(
     label="Double Gaussian Fit",
 )
 
+# WE CAN FIND THE SADDLE POINT BY GETTING THE PEAK OF THE NEGATIVE GAUSSIAN
+
 
 ax.set_ylabel("Probability Density of Measurements")
 ax.set_xlabel(r"B$_x$ " + f" (binsize {binsize} nT)")

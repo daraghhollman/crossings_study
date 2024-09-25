@@ -7,8 +7,8 @@ For each crossing interval, we determine the midpoint and calculate Mercury's di
 import datetime as dt
 
 import hermpy.boundary_crossings as boundaries
-import hermpy.trajectory as trajectory
 import hermpy.plotting_tools as plotting
+import hermpy.trajectory as trajectory
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -67,37 +67,108 @@ for i in tqdm(range(len(crossings)), total=len(crossings)):
 heliocentric_distances = heliocentric_distances[heliocentric_distances != None]
 local_times = local_times[local_times != None]
 
+
+# We also want to get the heliocentric distances for the whole mission
+# This will help us to isolate bias from the timing of the mission
+mission_start = dt.datetime(year=2011, month=3, day=23)
+mission_end = dt.datetime(year=2015, month=4, day=30)
+
+# Sample every hour
+# Initially I was sampling every day, but got some weird resonance effects in the data
+mission_days = [
+    mission_start + i * dt.timedelta(hours=1)
+    for i in range((mission_end - mission_start).days * 24 + 1)
+]
+mission_heliocentric_distances = np.array(
+    [trajectory.Get_Heliocentric_Distance(date) / 57.91e6 for date in mission_days]
+)
+
+
 # Make histograms
-fig, axes = plt.subplots(1, 2, sharey=True)
+fig, axes = plt.subplots(1, 4, figsize=(28, 8))
 
-ax1, ax2 = axes
+ax1, ax2, ax3, ax4 = axes
 
-heliocentric_bins = np.arange(0.75, 1.25 + 0.01, 0.01)
+heliocentric_bins = np.arange(0.79, 1.21 + 0.01, 0.01)
 local_time_bins = np.arange(0, 24 + 1, 1)
 
-ax1.hist(
+cmap = mpl.colormaps["viridis"]
+
+
+# Total mission heliocentric distribution
+mission_hist_data, heliocentric_bin_edges, _ = ax1.hist(
+    mission_heliocentric_distances,
+    bins=heliocentric_bins,
+    label=f"{len(mission_days)} hours",
+    color=cmap(0.25),
+    density=True,
+)
+
+# Raw interval samples for heliocentric distance
+intervals_hist_data, _, _ = ax2.hist(
     heliocentric_distances,
     bins=heliocentric_bins,
     label=f"{len(crossings)} crossing intervals",
-    color="indianred",
+    color=cmap(0.5),
+    density=True,
 )
-ax2.hist(
+
+# Raw interval samples divided by total mission
+heliocentric_bin_centres = (
+    heliocentric_bin_edges[:-1] + heliocentric_bin_edges[1:]
+) / 2
+
+ratio = np.divide(intervals_hist_data, mission_hist_data)
+ax3.plot(
+    heliocentric_bin_centres,
+    ratio,
+    color=cmap(0.75),
+)
+
+ax3.axhline(
+    np.nanmean(ratio), color="grey", label=r"$\mu$" + f" = {np.nanmean(ratio):.2f}"
+)
+ax3.axhline(
+    np.nanmean(ratio) + np.nanstd(ratio),
+    color="grey",
+    ls="dotted",
+    label=r"$\sigma$" + f" = {np.nanstd(ratio):.3f}",
+)
+ax3.axhline(np.nanmean(ratio) - np.nanstd(ratio), color="grey", ls="dotted")
+
+# Raw interval samples for local time
+ax4.hist(
     local_times,
     bins=local_time_bins,
     label=f"{len(crossings)} crossing intervals",
-    color="indianred",
+    color=cmap(0.99),
+    density=True,
 )
 
 ax1.set_xlabel("Heliocentric Distance [ semi-major axes ]\n(Binsize: 0.01)")
-ax2.set_xlabel("Local Time [ hours ]\n(Binsize: 1)")
+ax1.set_ylabel("Probability Density")
+ax1.set_title("Full Mission Distribution\n(Sampled Hourly)")
 
-ax2.set_xticks(local_time_bins[::4])
+ax2.set_xlabel("Heliocentric Distance [ semi-major axes ]\n(Binsize: 0.01)")
+ax2.set_ylabel("Probability Density")
+ax2.set_title("Boundary Interval Distribution\n(Start Time)")
 
-ax1.set_ylabel("Number of Boundary Intervals")
+ax3.set_ylim(0.8, 1.2)
+ax3.set_xlabel("Heliocentric Distance [ semi-major axes ]\n(Binsize: 0.01)")
+ax3.set_ylabel("Ratio (b / a)")
+ax3.set_title("Normalised Boundary Interval Distribution\n(Panels b / a)")
 
-for ax in axes:
+ax4.set_ylim(0, 0.08)
+ax4.set_xlabel("Local Time [ hours ]\n(Binsize: 1)")
+ax4.set_ylabel("Probability Density")
+ax4.set_xticks(local_time_bins[::4])
+ax4.set_title("Boundary Interval Distribution\n(Start Time)")
+
+
+axis_labels = ["a", "b", "c", "d"]
+for i, ax in enumerate(axes):
+    ax.text(0.05, 0.95, axis_labels[i] + ")", transform=ax.transAxes)
     ax.margins(0)
     ax.legend()
 
-fig.suptitle("Philpott Boundary Interval Distributions")
-plt.show()
+plt.savefig("/home/daraghhollman/Main/mercury/Figures/philpott_distributions_extended.png", dpi=200)

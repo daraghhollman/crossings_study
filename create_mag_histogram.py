@@ -5,6 +5,7 @@ The aim is to input any two times and create the plot between those times.
 """
 
 import datetime as dt
+import sys
 from glob import glob
 
 import hermpy.boundary_crossings as boundaries
@@ -18,6 +19,21 @@ import numpy as np
 import spiceypy as spice
 from scipy.optimize import curve_fit
 
+pump_directory = "/home/daraghhollman/Main/mercury/KTH22-model/"
+pump_control_params = pump_directory + "control_params_v8b.json"
+pump_fit_params = pump_directory + "kth_own_cf_fit_parameters_opt_total_March23.dat"
+sys.path.append(pump_directory)
+
+from kth22_model_for_mercury_v8 import kth22_model_for_mercury_v8 as Pump
+
+add_pump_model = True
+histogram_parameter = "x"  # options: magnitude, x
+fit_curve = True
+
+# Select disturbance index for pump model. Here we assume the mean value of 50
+disturbance_index = 50
+
+
 # PARAMETERS
 mpl.rcParams["font.size"] = 15
 root_dir = "/home/daraghhollman/Main/data/mercury/messenger/mag/avg_1_second/"
@@ -27,8 +43,8 @@ philpott_crossings = boundaries.Load_Crossings(
     "/home/daraghhollman/Main/mercury/philpott_2020_reformatted.csv"
 )
 
-start_time = dt.datetime(year=2011, month=6, day=5, hour=22, minute=5)
-end_time = dt.datetime(year=2011, month=6, day=5, hour=23, minute=25)
+start_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=0)
+end_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=6)
 
 
 # STEP ONE: LOAD DATA
@@ -86,7 +102,10 @@ to_plot = ["mag_x", "mag_total"]
 y_labels = ["B$_x$", "|B|"]
 for i, ax in enumerate(mag_axes):
 
-    ax.plot(data["date"], data[to_plot[i]], color="black", lw=0.8)
+    ax.plot(
+        data["date"], data[to_plot[i]], color="black", lw=0.8, label="MESSENGER MAG"
+    )
+    boundaries.Plot_Crossing_Intervals(ax, start_time, end_time, philpott_crossings)
     ax.set_ylabel(y_labels[i])
 
     # Plot hline at 0
@@ -102,27 +121,31 @@ for i, ax in enumerate(mag_axes):
 # Add ephemeris
 plotting.Add_Tick_Ephemeris(
     mag_axes[-1],
-    include={"date", "hours", "minutes", "range", "local time"},
+    include={"hours", "minutes", "range", "local time"},
 )
 ax3.set_xticklabels([])
 
 # Get trajectory data from spice
 time_padding = dt.timedelta(hours=6)
 spice_dates = [
-    start_time.strftime("%Y-%m-%d %H:%M:%S"),
-    end_time.strftime("%Y-%m-%d %H:%M:%S"),
+    start_time,
+    end_time,
 ]
 
 padded_dates = [
-    (start_time - time_padding).strftime("%Y-%m-%d %H:%M:%S"),
-    (end_time + time_padding).strftime("%Y-%m-%d %H:%M:%S"),
+    (start_time - time_padding),
+    (end_time + time_padding),
 ]
 
 frame = "MSM"
 
 # Get positions in MSO coordinate system
 positions = trajectory.Get_Trajectory(
-    "Messenger", spice_dates, frame=frame, aberrate=True
+    "Messenger",
+    spice_dates,
+    steps=int((end_time - start_time).total_seconds()) + 1,
+    frame=frame,
+    aberrate=True,
 )
 padded_positions = trajectory.Get_Trajectory(
     "Messenger", padded_dates, frame=frame, aberrate=True
@@ -165,18 +188,67 @@ trajectory_axes[1].legend(
 )
 
 
+# ADD PUMP MODEL TO TIME SERIES PLOTS
+
+if add_pump_model:
+    # Get the model mag values for the positions
+    pump_positions = positions * 2439.7  # Convert back to km from radii
+    # Here our example is around only an hour long, we can assume a constant heliocentric distance
+    midpoint = start_time + (end_time - start_time) / 2
+    heliocentric_distance = trajectory.Get_Heliocentric_Distance(midpoint)
+    # Convert to AU
+    heliocentric_distance /= 1.496e8
+
+    # Determine the field for the trajectory
+    pump_field = Pump(
+        pump_positions[:, 0],
+        pump_positions[:, 1],
+        pump_positions[:, 2],
+        heliocentric_distance,
+        disturbance_index,
+        pump_control_params,
+        pump_fit_params,
+    )
+
+    # Add to axes
+    # First for BX
+    mag_axes[0].plot(
+        data["date"], pump_field[0], color="magenta", label="Pump+ (2024), DI=50"
+    )
+    # Then for |B|
+    pump_magnitude = np.sqrt(
+        pump_field[0] ** 2 + pump_field[1] ** 2 + pump_field[2] ** 2
+    )
+    mag_axes[1].plot(
+        data["date"], pump_magnitude, color="magenta", label="Pump+ (2024), DI=50"
+    )
+
+    for ax in mag_axes:
+        ax.legend(loc="lower left")
+
 # STEP FOUR: PLOTTING HISTOGRAM OF B_X
 
-ax5 = plt.subplot2grid((4,4), (0, 2), colspan=2, rowspan=4)
+ax5 = plt.subplot2grid((4, 4), (0, 2), colspan=2, rowspan=4)
 
-binsize = 5 # nT
-bins = np.arange(np.min(data["mag_x"]), np.max(data["mag_x"]), binsize)
+match histogram_parameter:
+    case "x":
+        histogram_parameter = data["mag_x"]
+    case "magnitude":
+        histogram_parameter = np.sqrt(
+            data["mag_x"] ** 2 + data["mag_y"] ** 2 + data["mag_z"] ** 2
+        )
+    case _:
+        raise ValueError("Histogram Parameter is not set!")
+
+binsize = 1  # nT
+bins = np.arange(np.min(histogram_parameter), np.max(histogram_parameter), binsize)
 hist_data, bin_edges, _ = ax5.hist(
-    data["mag_x"],
+    histogram_parameter,
     bins=bins,
     density=True,
     color="black",
-    label=f"{start_time.strftime('%Y-%M-%d %H:%M:%S')} to {end_time.strftime('%Y-%M-%d %H:%M:%S')}" + "\nsampled per second",
+    label=f"{start_time.strftime('%Y-%M-%d %H:%M:%S')} to {end_time.strftime('%Y-%M-%d %H:%M:%S')}"
+    + "\nsampled per second",
 )
 
 bin_centres = bin_edges[:-1] + np.diff(bin_edges) / 2
@@ -190,28 +262,38 @@ def Double_Gaussian(x, c1, mu1, sigma1, c2, mu2, sigma2):
     return res
 
 
-pars, cov = curve_fit(
-    # We need to pass some initial guess parameters, these were chosen arbitraraly
-    Double_Gaussian, bin_centres, hist_data, [0.01, -20, 10, 0.01, 20, 10]
-)
+if fit_curve:
+    curve_fit_guess_params = [
+        0.01,
+        np.mean(histogram_parameter) - np.std(histogram_parameter),
+        5,
+        0.01,
+        np.mean(histogram_parameter) + np.std(histogram_parameter),
+        5,
+    ]
+    pars, cov = curve_fit(
+        # We need to pass some initial guess parameters, these were chosen arbitraraly
+        Double_Gaussian,
+        bin_centres,
+        hist_data,
+        curve_fit_guess_params,
+    )
 
-ax5.plot(
-    np.linspace(bins[0], bins[-1], 100),
-    Double_Gaussian(
+    ax5.plot(
         np.linspace(bins[0], bins[-1], 100),
-        pars[0],
-        pars[1],
-        pars[2],
-        pars[3],
-        pars[4],
-        pars[5],
-    ),
-    color="magenta",
-    lw=3,
-    label="Double Gaussian Fit",
-)
-
-# WE CAN FIND THE SADDLE POINT BY GETTING THE PEAK OF THE NEGATIVE GAUSSIAN
+        Double_Gaussian(
+            np.linspace(bins[0], bins[-1], 100),
+            pars[0],
+            pars[1],
+            pars[2],
+            pars[3],
+            pars[4],
+            pars[5],
+        ),
+        color="magenta",
+        lw=3,
+        label="Double Gaussian Fit",
+    )
 
 
 ax5.set_ylabel("Probability Density of Measurements")
@@ -221,4 +303,7 @@ ax5.yaxis.set_label_position("right")
 
 plt.legend()
 
-plt.savefig(f"/home/daraghhollman/Main/mercury/Figures/bimodal/bimodal_{start_time.strftime("%Y_%m_%d__%H_%M_%S")}_{end_time.strftime("%Y_%m_%d__%H_%M_%S")}.png", dpi=900)
+plt.savefig(
+    f"/home/daraghhollman/Main/mercury/Figures/bimodal/bimodal_{start_time.strftime("%Y_%m_%d__%H_%M_%S")}_{end_time.strftime("%Y_%m_%d__%H_%M_%S")}.png",
+    dpi=900,
+)

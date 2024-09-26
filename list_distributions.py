@@ -226,6 +226,7 @@ ax3.axhline(np.nanmean(ratio_local_time) - np.nanstd(ratio_local_time), color="g
 ax1.set_ylim(0, 0.08)
 ax1.set_xlabel("Local Time [ hours ]\n(Binsize: 1)")
 ax1.set_ylabel("Probability Density")
+ax1.set_xticks(local_time_bins[::4])
 ax1.set_title("Full Mission Distribution\n(Sampled Hourly)")
 
 ax2.set_ylim(0, 0.08)
@@ -235,7 +236,8 @@ ax2.set_xticks(local_time_bins[::4])
 ax2.set_title("Boundary Interval Distribution\n(Start Time)")
 
 ax3.set_ylim(0.8, 1.2)
-ax2.set_xlabel("Local Time [ hours ]\n(Binsize: 1)")
+ax3.set_xlabel("Local Time [ hours ]\n(Binsize: 1)")
+ax3.set_xticks(local_time_bins[::4])
 ax3.set_ylabel("Ratio (b / a)")
 ax3.set_title("Normalised Boundary Interval Distribution\n(Panels b / a)")
 

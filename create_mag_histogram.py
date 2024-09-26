@@ -15,14 +15,16 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
+import spiceypy as spice
 from scipy.optimize import curve_fit
 
 # PARAMETERS
-mpl.rcParams["font.size"] = 14
+mpl.rcParams["font.size"] = 15
 root_dir = "/home/daraghhollman/Main/data/mercury/messenger/mag/avg_1_second/"
 metakernel = "/home/daraghhollman/Main/SPICE/messenger/metakernel_messenger.txt"
+spice.furnsh(metakernel)
 philpott_crossings = boundaries.Load_Crossings(
-    "/home/daraghhollman/Main/mercury/philpott_crossings.p"
+    "/home/daraghhollman/Main/mercury/philpott_2020_reformatted.csv"
 )
 
 start_time = dt.datetime(year=2011, month=6, day=5, hour=22, minute=5)
@@ -67,15 +69,15 @@ data = mag.Adjust_For_Aberration(data)
 
 # STEP THREE: PLOTTING TIME SERIES
 
-fig = plt.figure()
+fig = plt.figure(figsize=(28, 14))
 
 # Make trajectory axes
-ax1 = plt.subplot2grid((4, 2), (0, 0), colspan=1, rowspan=2)
-ax2 = plt.subplot2grid((4, 2), (0, 1), colspan=1, rowspan=2)
+ax1 = plt.subplot2grid((4, 4), (0, 0), colspan=1, rowspan=2)
+ax2 = plt.subplot2grid((4, 4), (0, 1), colspan=1, rowspan=2)
 trajectory_axes = [ax1, ax2]
 
-ax3 = plt.subplot2grid((4, 2), (2, 0), colspan=2)
-ax4 = plt.subplot2grid((4, 2), (3, 0), colspan=2)
+ax3 = plt.subplot2grid((4, 4), (2, 0), colspan=2)
+ax4 = plt.subplot2grid((4, 4), (3, 0), colspan=2)
 mag_axes = [ax3, ax4]
 
 
@@ -100,10 +102,9 @@ for i, ax in enumerate(mag_axes):
 # Add ephemeris
 plotting.Add_Tick_Ephemeris(
     mag_axes[-1],
-    metakernel,
     include={"date", "hours", "minutes", "range", "local time"},
 )
-
+ax3.set_xticklabels([])
 
 # Get trajectory data from spice
 time_padding = dt.timedelta(hours=6)
@@ -121,10 +122,10 @@ frame = "MSM"
 
 # Get positions in MSO coordinate system
 positions = trajectory.Get_Trajectory(
-    "Messenger", spice_dates, metakernel, frame=frame, aberrate=True
+    "Messenger", spice_dates, frame=frame, aberrate=True
 )
 padded_positions = trajectory.Get_Trajectory(
-    "Messenger", padded_dates, metakernel, frame=frame, aberrate=True
+    "Messenger", padded_dates, frame=frame, aberrate=True
 )
 
 # Convert from km to Mercury radii
@@ -160,24 +161,22 @@ for i, ax in enumerate(trajectory_axes):
     plotting.SquareAxes(ax, 4)
 
 trajectory_axes[1].legend(
-    bbox_to_anchor=(0.5, 1.2), loc="center", ncol=2, borderaxespad=0.5
+    bbox_to_anchor=(-0.1, 1.2), loc="center", ncol=2, borderaxespad=0.5
 )
-
-plt.show()
 
 
 # STEP FOUR: PLOTTING HISTOGRAM OF B_X
 
-fig, ax = plt.subplots()
+ax5 = plt.subplot2grid((4,4), (0, 2), colspan=2, rowspan=4)
 
-binsize = 1
+binsize = 5 # nT
 bins = np.arange(np.min(data["mag_x"]), np.max(data["mag_x"]), binsize)
-hist_data, bin_edges, _ = ax.hist(
+hist_data, bin_edges, _ = ax5.hist(
     data["mag_x"],
     bins=bins,
     density=True,
-    color="cornflowerblue",
-    label=f"{start_time.strftime('%Y-%M-%d %H:%M')} to {start_time.strftime('%Y-%M-%d %H:%M')}",
+    color="black",
+    label=f"{start_time.strftime('%Y-%M-%d %H:%M:%S')} to {end_time.strftime('%Y-%M-%d %H:%M:%S')}" + "\nsampled per second",
 )
 
 bin_centres = bin_edges[:-1] + np.diff(bin_edges) / 2
@@ -192,13 +191,14 @@ def Double_Gaussian(x, c1, mu1, sigma1, c2, mu2, sigma2):
 
 
 pars, cov = curve_fit(
+    # We need to pass some initial guess parameters, these were chosen arbitraraly
     Double_Gaussian, bin_centres, hist_data, [0.01, -20, 10, 0.01, 20, 10]
 )
 
-ax.plot(
-    bins,
+ax5.plot(
+    np.linspace(bins[0], bins[-1], 100),
     Double_Gaussian(
-        bins,
+        np.linspace(bins[0], bins[-1], 100),
         pars[0],
         pars[1],
         pars[2],
@@ -206,7 +206,7 @@ ax.plot(
         pars[4],
         pars[5],
     ),
-    color="indianred",
+    color="magenta",
     lw=3,
     label="Double Gaussian Fit",
 )
@@ -214,8 +214,11 @@ ax.plot(
 # WE CAN FIND THE SADDLE POINT BY GETTING THE PEAK OF THE NEGATIVE GAUSSIAN
 
 
-ax.set_ylabel("Probability Density of Measurements")
-ax.set_xlabel(r"B$_x$ " + f" (binsize {binsize} nT)")
+ax5.set_ylabel("Probability Density of Measurements")
+ax5.set_xlabel(r"B$_x$ " + f" (binsize {binsize} nT)")
+ax5.yaxis.tick_right()
+ax5.yaxis.set_label_position("right")
 
 plt.legend()
-plt.show()
+
+plt.savefig(f"/home/daraghhollman/Main/mercury/Figures/bimodal/bimodal_{start_time.strftime("%Y_%m_%d__%H_%M_%S")}_{end_time.strftime("%Y_%m_%d__%H_%M_%S")}.png", dpi=900)

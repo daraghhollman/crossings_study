@@ -26,8 +26,8 @@ sys.path.append(pump_directory)
 
 from kth22_model_for_mercury_v8 import kth22_model_for_mercury_v8 as Pump
 
-add_pump_model = True
-histogram_parameter = "x"  # options: magnitude, x
+add_pump_model = False
+histogram_parameter = "magnitude"  # options: magnitude, x
 fit_curve = True
 
 # Select disturbance index for pump model. Here we assume the mean value of 50
@@ -43,8 +43,8 @@ philpott_crossings = boundaries.Load_Crossings(
     "/home/daraghhollman/Main/mercury/philpott_2020_reformatted.csv"
 )
 
-start_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=0)
-end_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=6)
+start_time = dt.datetime(year=2011, month=3, day=31, hour=13, minute=50)
+end_time = dt.datetime(year=2011, month=3, day=31, hour=14, minute=5)
 
 
 # STEP ONE: LOAD DATA
@@ -233,10 +233,12 @@ ax5 = plt.subplot2grid((4, 4), (0, 2), colspan=2, rowspan=4)
 match histogram_parameter:
     case "x":
         histogram_parameter = data["mag_x"]
+        histogram_axis_label = r"B$_x$"
     case "magnitude":
         histogram_parameter = np.sqrt(
             data["mag_x"] ** 2 + data["mag_y"] ** 2 + data["mag_z"] ** 2
         )
+        histogram_axis_label = r"|B|"
     case _:
         raise ValueError("Histogram Parameter is not set!")
 
@@ -297,7 +299,8 @@ if fit_curve:
 
 
 ax5.set_ylabel("Probability Density of Measurements")
-ax5.set_xlabel(r"B$_x$ " + f" (binsize {binsize} nT)")
+
+ax5.set_xlabel(histogram_axis_label + f" (binsize {binsize} nT)")
 ax5.yaxis.tick_right()
 ax5.yaxis.set_label_position("right")
 

@@ -16,8 +16,11 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
+import scipy.signal
 import spiceypy as spice
 from scipy.optimize import curve_fit
+
+from plotting_tools import colored_line
 
 pump_directory = "/home/daraghhollman/Main/mercury/KTH22-model/"
 pump_control_params = pump_directory + "control_params_v8b.json"
@@ -26,9 +29,13 @@ sys.path.append(pump_directory)
 
 from kth22_model_for_mercury_v8 import kth22_model_for_mercury_v8 as Pump
 
-add_pump_model = True
-histogram_parameter = "x"  # options: magnitude, x
+add_pump_model = False
+histogram_parameter = "magnitude"  # options: magnitude, x
 fit_curve = True
+split_method = "minimum_point"  # none, threshold, midpoint, minimum_point
+
+# if threshold is selected:
+number_of_sigmas = 7
 
 # Select disturbance index for pump model. Here we assume the mean value of 50
 disturbance_index = 50
@@ -43,8 +50,8 @@ philpott_crossings = boundaries.Load_Crossings(
     "/home/daraghhollman/Main/mercury/philpott_2020_reformatted.csv"
 )
 
-start_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=0)
-end_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=6)
+start_time = dt.datetime(year=2012, month=7, day=2, hour=17, minute=20)
+end_time = dt.datetime(year=2012, month=7, day=2, hour=17, minute=40)
 
 
 # STEP ONE: LOAD DATA
@@ -102,9 +109,14 @@ to_plot = ["mag_x", "mag_total"]
 y_labels = ["B$_x$", "|B|"]
 for i, ax in enumerate(mag_axes):
 
-    ax.plot(
-        data["date"], data[to_plot[i]], color="black", lw=0.8, label="MESSENGER MAG"
-    )
+    if split_method == "None":
+        # If we're not dividing the data, we simply plot the data as is
+        ax.plot(
+            data["date"], data[to_plot[i]], color="black", lw=0.8, label="MESSENGER MAG"
+        )
+    else:
+        ax.plot(data["date"], data[to_plot[i]], color="black", lw=0.8, zorder=-1)
+
     boundaries.Plot_Crossing_Intervals(ax, start_time, end_time, philpott_crossings)
     ax.set_ylabel(y_labels[i])
 
@@ -283,44 +295,139 @@ if fit_curve:
         curve_fit_guess_params,
     )
 
+    fit_range = np.linspace(bins[0], bins[-1], 100)
+    fit_values = Double_Gaussian(
+        fit_range,
+        pars[0],
+        pars[1],
+        pars[2],
+        pars[3],
+        pars[4],
+        pars[5],
+    )
+
     ax5.plot(
-        np.linspace(bins[0], bins[-1], 100),
-        Double_Gaussian(
-            np.linspace(bins[0], bins[-1], 100),
-            pars[0],
-            pars[1],
-            pars[2],
-            pars[3],
-            pars[4],
-            pars[5],
-        ),
+        fit_range,
+        fit_values,
         color="magenta",
         lw=3,
         label="Double Gaussian Fit",
     )
 
-    gaussians_midpoint = (pars[1] + pars[4]) / 2
-    """
-    num_sigmas = 2
-    ax5.axvline(pars[1], color="green", label="Individual Gaussian Mean")
-    ax5.axvline(pars[4], color="blue")
-    ax5.axvline(
-        pars[1] + num_sigmas * pars[2],
-        color="green",
-        ls="dashed",
-        label=f"Individual Gaussian {num_sigmas}" + r"$\sigma$",
-    )
-    ax5.axvline(pars[1] - num_sigmas * pars[2], color="green", ls="dashed")
-    ax5.axvline(pars[4] + num_sigmas * pars[5], color="blue", ls="dashed")
-    ax5.axvline(pars[4] - num_sigmas * pars[5], color="blue", ls="dashed")
+    match split_method:
+        case "none":
+            pass
 
-    match histogram_parameter:
-        case "x":
-            mag_axes[0].axhline(gaussians_midpoint, color="grey")
+        case "threshold":
+            # Upper threshold:
+            #       If the data is low, and we go higher than this then we switch.
+            #       Upper threshold is the mean - 1 sigma of the upper gaussian
+            upper_threshold = pars[4] - number_of_sigmas * pars[5]
 
-        case "magnitude":
-            mag_axes[1].axhline(gaussians_midpoint, color="grey")
-    """
+            # Lower threshold:
+            #       If the data is high, and we go lower than this then we switch.
+            #       Lower threshold is the mean + 1 sigma of the lower gaussian
+            lower_threshold = pars[1] + number_of_sigmas * pars[2]
+
+            region_index = []
+            # Low region = 0, high region = 1
+            # We determine the initial region from a comparison of the first data point
+            if histogram_parameter_values[0] > upper_threshold:
+                current_region = 1
+            elif histogram_parameter_values[0] < lower_threshold:
+                current_region = 0
+            # We need to handle cases between
+            else:
+                upper_difference = upper_threshold - histogram_parameter_values
+                lower_difference = histogram_parameter_values - lower_threshold
+
+                if upper_difference >= lower_difference:
+                    current_region = 1
+                else:
+                    current_region = 0
+
+            for i, field_value in enumerate(histogram_parameter_values):
+
+                if field_value > upper_threshold:
+                    current_region = 1
+                elif field_value < lower_threshold:
+                    current_region = 0
+
+                region_index.append(current_region)
+
+            colored_line(
+                data["date"], data["mag_x"], region_index, ax=mag_axes[0], cmap="bwr"
+            )
+            colored_line(
+                data["date"],
+                data["mag_total"],
+                region_index,
+                ax=mag_axes[1],
+                cmap="bwr",
+            )
+
+            ax5.axvline(upper_threshold, color="red", label="Upper Threshold")
+            ax5.axvline(lower_threshold, color="blue", label="Lower Threshold")
+
+        case "midpoint":
+            # Find the midpoint between the two peaks
+            midpoint = (pars[1] + pars[4]) / 2
+
+            region_index = []
+
+            for i, field_value in enumerate(histogram_parameter_values):
+
+                if field_value > midpoint:
+                    current_region = 1
+                else:
+                    current_region = 0
+
+                region_index.append(current_region)
+
+            colored_line(
+                data["date"], data["mag_x"], region_index, ax=mag_axes[0], cmap="bwr"
+            )
+            colored_line(
+                data["date"],
+                data["mag_total"],
+                region_index,
+                ax=mag_axes[1],
+                cmap="bwr",
+            )
+
+            ax5.axvline(midpoint, color="orange", label="Midpoint")
+
+        case "minimum_point":
+            # Split based off of the minimum point of the gaussian distribution
+            distribution_minimum_index, _ = scipy.signal.find_peaks(-fit_values)
+
+            distribution_minimum = fit_range[distribution_minimum_index]
+
+            region_index = []
+
+            for i, field_value in enumerate(histogram_parameter_values):
+
+                if field_value > distribution_minimum:
+                    current_region = 1
+                else:
+                    current_region = 0
+
+                region_index.append(current_region)
+
+            colored_line(
+                data["date"], data["mag_x"], region_index, ax=mag_axes[0], cmap="bwr"
+            )
+            colored_line(
+                data["date"],
+                data["mag_total"],
+                region_index,
+                ax=mag_axes[1],
+                cmap="bwr",
+            )
+
+            ax5.axvline(distribution_minimum, color="orange", label="Distribution Minimum")
+
+
 
 
 ax5.set_ylabel("Probability Density of Measurements")

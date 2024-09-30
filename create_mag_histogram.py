@@ -26,8 +26,8 @@ sys.path.append(pump_directory)
 
 from kth22_model_for_mercury_v8 import kth22_model_for_mercury_v8 as Pump
 
-add_pump_model = False
-histogram_parameter = "magnitude"  # options: magnitude, x
+add_pump_model = True
+histogram_parameter = "x"  # options: magnitude, x
 fit_curve = True
 
 # Select disturbance index for pump model. Here we assume the mean value of 50
@@ -43,8 +43,8 @@ philpott_crossings = boundaries.Load_Crossings(
     "/home/daraghhollman/Main/mercury/philpott_2020_reformatted.csv"
 )
 
-start_time = dt.datetime(year=2011, month=3, day=31, hour=13, minute=50)
-end_time = dt.datetime(year=2011, month=3, day=31, hour=14, minute=5)
+start_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=0)
+end_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=6)
 
 
 # STEP ONE: LOAD DATA
@@ -179,9 +179,9 @@ trajectory_axes[1].plot(
 planes = ["xy", "xz"]
 for i, ax in enumerate(trajectory_axes):
     plotting.Plot_Mercury(ax, shaded_hemisphere="left", plane=planes[i], frame=frame)
-    plotting.AddLabels(ax, planes[i], frame=frame, aberrate=True)
-    plotting.PlotMagnetosphericBoundaries(ax, plane=planes[i], add_legend=True)
-    plotting.SquareAxes(ax, 4)
+    plotting.Add_Labels(ax, planes[i], frame=frame, aberrate=True)
+    plotting.Plot_Magnetospheric_Boundaries(ax, plane=planes[i], add_legend=True)
+    plotting.Square_Axes(ax, 4)
 
 trajectory_axes[1].legend(
     bbox_to_anchor=(-0.1, 1.2), loc="center", ncol=2, borderaxespad=0.5
@@ -232,10 +232,10 @@ ax5 = plt.subplot2grid((4, 4), (0, 2), colspan=2, rowspan=4)
 
 match histogram_parameter:
     case "x":
-        histogram_parameter = data["mag_x"]
+        histogram_parameter_values = data["mag_x"]
         histogram_axis_label = r"B$_x$"
     case "magnitude":
-        histogram_parameter = np.sqrt(
+        histogram_parameter_values = np.sqrt(
             data["mag_x"] ** 2 + data["mag_y"] ** 2 + data["mag_z"] ** 2
         )
         histogram_axis_label = r"|B|"
@@ -243,9 +243,11 @@ match histogram_parameter:
         raise ValueError("Histogram Parameter is not set!")
 
 binsize = 1  # nT
-bins = np.arange(np.min(histogram_parameter), np.max(histogram_parameter), binsize)
+bins = np.arange(
+    np.min(histogram_parameter_values), np.max(histogram_parameter_values), binsize
+)
 hist_data, bin_edges, _ = ax5.hist(
-    histogram_parameter,
+    histogram_parameter_values,
     bins=bins,
     density=True,
     color="black",
@@ -267,10 +269,10 @@ def Double_Gaussian(x, c1, mu1, sigma1, c2, mu2, sigma2):
 if fit_curve:
     curve_fit_guess_params = [
         0.01,
-        np.mean(histogram_parameter) - np.std(histogram_parameter),
+        np.mean(histogram_parameter_values) - np.std(histogram_parameter_values),
         5,
         0.01,
-        np.mean(histogram_parameter) + np.std(histogram_parameter),
+        np.mean(histogram_parameter_values) + np.std(histogram_parameter_values),
         5,
     ]
     pars, cov = curve_fit(
@@ -297,6 +299,29 @@ if fit_curve:
         label="Double Gaussian Fit",
     )
 
+    gaussians_midpoint = (pars[1] + pars[4]) / 2
+    """
+    num_sigmas = 2
+    ax5.axvline(pars[1], color="green", label="Individual Gaussian Mean")
+    ax5.axvline(pars[4], color="blue")
+    ax5.axvline(
+        pars[1] + num_sigmas * pars[2],
+        color="green",
+        ls="dashed",
+        label=f"Individual Gaussian {num_sigmas}" + r"$\sigma$",
+    )
+    ax5.axvline(pars[1] - num_sigmas * pars[2], color="green", ls="dashed")
+    ax5.axvline(pars[4] + num_sigmas * pars[5], color="blue", ls="dashed")
+    ax5.axvline(pars[4] - num_sigmas * pars[5], color="blue", ls="dashed")
+
+    match histogram_parameter:
+        case "x":
+            mag_axes[0].axhline(gaussians_midpoint, color="grey")
+
+        case "magnitude":
+            mag_axes[1].axhline(gaussians_midpoint, color="grey")
+    """
+
 
 ax5.set_ylabel("Probability Density of Measurements")
 
@@ -308,5 +333,5 @@ plt.legend()
 
 plt.savefig(
     f"/home/daraghhollman/Main/mercury/Figures/bimodal/bimodal_{start_time.strftime("%Y_%m_%d__%H_%M_%S")}_{end_time.strftime("%Y_%m_%d__%H_%M_%S")}.png",
-    dpi=900,
+    dpi=300,
 )

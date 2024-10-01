@@ -35,7 +35,7 @@ fit_curve = True
 split_method = "minimum_point"  # none, threshold, midpoint, minimum_point
 
 # if threshold is selected:
-number_of_sigmas = 7
+number_of_sigmas = 3
 
 # Select disturbance index for pump model. Here we assume the mean value of 50
 disturbance_index = 50

@@ -62,7 +62,7 @@ for i, ax in enumerate(mag_axes):
     else:
         ax.plot(data["date"], data[to_plot[i]], color="black", lw=0.8, zorder=-1)
 
-    boundaries.Plot_Crossing_Intervals(ax, start_time, end_time, philpott_crossings)
+    boundaries.Plot_Crossing_Intervals(ax, start_time, end_time, philpott_crossings, color="k")
     ax.set_ylabel(y_labels[i])
 
     ax.set_xmargin(0)
@@ -192,6 +192,9 @@ if fit_curve:
     ]
 
     population_fit = bimodal_tools.Population_Fit(bin_centres, hist_data, curve_fit_guess_params)
+
+    print(population_fit.pars)
+    print(np.sqrt(np.diag(population_fit.cov)))
 
     histogram_axis.plot(
         population_fit.x_range,

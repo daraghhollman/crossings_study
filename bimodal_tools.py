@@ -3,14 +3,15 @@ Tools to aid in the investigation of the bimodal nature of the magnetic field at
 """
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+import matplotlib.colors as mcolors
 import numpy as np
-from numpy.typing import ArrayLike
 import pandas as pd
-from scipy.optimize import curve_fit
 import scipy.signal
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+from numpy.typing import ArrayLike
+from scipy.optimize import curve_fit
 
-from plotting_tools import colored_line
+from plotting_tools import colored_line, truncate_colormap
 
 
 def Create_Axes():
@@ -73,14 +74,8 @@ class Population_Fit:
             self.x_range,
             *self.pars,
         )
-        self.population_a = Single_Gaussian(
-            self.x_range,
-            *self.population_a_pars
-        )
-        self.population_b = Single_Gaussian(
-            self.x_range,
-            *self.population_b_pars
-        )
+        self.population_a = Single_Gaussian(self.x_range, *self.population_a_pars)
+        self.population_b = Single_Gaussian(self.x_range, *self.population_b_pars)
 
     def Get_CurveFit(self):
 
@@ -112,9 +107,10 @@ def Split_Distribution(
             # in distribution A and in distribution B.
             # We take the most likely option as the direction (towards -1 or +1),
             # and the value between 0 and +/-1.
-            probabilities = []
+            probabilities_a = []
+            probabilities_b = []
             for field_value in distribution_values:
-                
+
                 # Find the likelihood we're in distribution A and B
                 a_likelihood = Single_Gaussian(field_value, *fit.population_a_pars)
                 b_likelihood = Single_Gaussian(field_value, *fit.population_b_pars)
@@ -123,38 +119,68 @@ def Split_Distribution(
                 probability_point_in_b = b_likelihood / (a_likelihood + b_likelihood)
 
                 if probability_point_in_a > probability_point_in_b:
-                    probabilities.append(probability_point_in_a)
+                    probabilities_a.append(probability_point_in_a)
+                    probabilities_b.append(np.nan)
 
                 elif probability_point_in_a < probability_point_in_b:
-                    probabilities.append(-probability_point_in_b)
+                    probabilities_b.append(probability_point_in_b)
+                    probabilities_a.append(np.nan)
 
                 else:
-                    probabilities.append(0)
+                    probabilities_a.append(0)
+                    probabilities_b.append(0)
 
-            line_x = colored_line(
+            cmap = plt.get_cmap("bwr")
+            cmap_a = truncate_colormap(cmap, 0.5, 0)
+            cmap_b = truncate_colormap(cmap, 0.5, 1)
+
+            line_x_a = colored_line(
                 mag_data["date"],
                 mag_data["mag_x"],
-                probabilities,
+                probabilities_a,
                 ax=mag_axes[0],
-                cmap="bwr",
+                cmap=cmap_a,
             )
-            line_total = colored_line(
+            line_x_b = colored_line(
+                mag_data["date"],
+                mag_data["mag_x"],
+                probabilities_b,
+                ax=mag_axes[0],
+                cmap=cmap_b,
+            )
+            line_total_a = colored_line(
                 mag_data["date"],
                 mag_data["mag_total"],
-                probabilities,
+                probabilities_a,
                 ax=mag_axes[1],
-                cmap="bwr",
+                cmap=cmap_a,
+            )
+            line_total_b = colored_line(
+                mag_data["date"],
+                mag_data["mag_total"],
+                probabilities_b,
+                ax=mag_axes[1],
+                cmap=cmap_b,
             )
 
             # Add an Axes to the right of the main Axes.
             ax1_divider = make_axes_locatable(mag_axes[0])
-            cax1 = ax1_divider.append_axes("right", size="2%", pad="2%")
-            fig.colorbar(line_x, cax=cax1)
+            cax1a = ax1_divider.append_axes("right", size="2%", pad="1%")
+            cax1b = ax1_divider.append_axes("right", size="2%", pad="1%")
+
+            a1_colorbar = fig.colorbar(line_x_a, cax=cax1a)
+            b1_colorbar = fig.colorbar(line_x_b, cax=cax1b)
+            a1_colorbar.set_ticks([])
+            b1_colorbar.set_label("Probability")
 
             ax2_divider = make_axes_locatable(mag_axes[1])
-            cax2 = ax2_divider.append_axes("right", size="2%", pad="2%")
-            fig.colorbar(line_total, cax=cax2)
+            cax2a = ax2_divider.append_axes("right", size="2%", pad="1%")
+            cax2b = ax2_divider.append_axes("right", size="2%", pad="1%")
 
+            a2_colorbar = fig.colorbar(line_total_a, cax=cax2a)
+            b2_colorbar = fig.colorbar(line_total_b, cax=cax2b)
+            a2_colorbar.set_ticks([])
+            b2_colorbar.set_label("Probability")
 
         case "midpoint":
             # Find the midpoint between the two peaks
@@ -190,7 +216,9 @@ def Split_Distribution(
 
         case "minimum_point":
             # Split based off of the minimum point of the gaussian distribution
-            distribution_minimum_index, _ = scipy.signal.find_peaks(-fit.output_y_values)
+            distribution_minimum_index, _ = scipy.signal.find_peaks(
+                -fit.output_y_values
+            )
 
             distribution_minimum = fit.x_range[distribution_minimum_index]
 
@@ -206,7 +234,11 @@ def Split_Distribution(
                 region_index.append(current_region)
 
             colored_line(
-                mag_data["date"], mag_data["mag_x"], region_index, ax=mag_axes[0], cmap="bwr"
+                mag_data["date"],
+                mag_data["mag_x"],
+                region_index,
+                ax=mag_axes[0],
+                cmap="bwr",
             )
             colored_line(
                 mag_data["date"],

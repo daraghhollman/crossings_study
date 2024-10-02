@@ -1,10 +1,23 @@
 import warnings
 
-import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
 
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100, log=False):
+    if not log:
+        new_cmap = mcolors.LinearSegmentedColormap.from_list(
+            'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+            cmap(np.linspace(minval, maxval, n)))
+    else:
+        new_cmap = mcolors.LinearSegmentedColormap.from_list(
+            'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+            cmap(np.logspace(minval, maxval, n)))
+
+    return new_cmap
 
 def colored_line(x, y, c, ax, **lc_kwargs):
     """

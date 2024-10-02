@@ -7,13 +7,13 @@ For each crossing interval, we determine the midpoint and calculate Mercury's di
 import datetime as dt
 
 import hermpy.boundary_crossings as boundaries
-import hermpy.plotting_tools as plotting
 import hermpy.trajectory as trajectory
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import spiceypy as spice
 from tqdm import tqdm
+import scipy.stats
 
 mpl.rcParams["font.size"] = 14
 
@@ -99,7 +99,6 @@ for i in range(len(mission_hours)):
 
     mission_local_times.append(((longitude + 180) * 24 / 360) % 24)
 
-
 # Make histograms
 fig, axes = plt.subplots(1, 3, figsize=(24, 8))
 
@@ -109,7 +108,6 @@ heliocentric_bins = np.arange(0.79, 1.21 + 0.01, 0.01)
 local_time_bins = np.arange(0, 24 + 1, 1)
 
 cmap = mpl.colormaps["viridis"]
-
 
 # Total mission heliocentric distribution
 mission_hist_data_heliocentric, heliocentric_bin_edges, _ = ax1.hist(
@@ -128,6 +126,10 @@ intervals_hist_data, _, _ = ax2.hist(
     color=cmap(0.5),
     density=True,
 )
+
+
+# Perform T-Test
+heliocentric_t_test = scipy.stats.ttest_ind(mission_hist_data_heliocentric, intervals_hist_data)
 
 # Raw interval samples divided by total mission
 heliocentric_bin_centres = (
@@ -164,7 +166,7 @@ ax2.set_title("Boundary Interval Distribution\n(Start Time)")
 ax3.set_ylim(0.8, 1.2)
 ax3.set_xlabel("Heliocentric Distance [ semi-major axes ]\n(Binsize: 0.01)")
 ax3.set_ylabel("Ratio (b / a)")
-ax3.set_title("Normalised Boundary Interval Distribution\n(Panels b / a)")
+ax3.set_title(f"Normalised Boundary Interval Distribution\n(Panels b / a)\nT-Test: p = {heliocentric_t_test.pvalue}")
 
 
 axis_labels = ["a", "b", "c"]
@@ -199,6 +201,9 @@ intervals_hist_data_local_time, _, _ = ax2.hist(
     color=cmap(0.5),
     density=True,
 )
+
+# Perform T-Test
+local_time_t_test = scipy.stats.ttest_ind(mission_hist_data_heliocentric, intervals_hist_data_local_time)
 
 # Raw interval samples divided by total mission
 local_time_bin_centres = (
@@ -239,7 +244,7 @@ ax3.set_ylim(0.8, 1.2)
 ax3.set_xlabel("Local Time [ hours ]\n(Binsize: 1)")
 ax3.set_xticks(local_time_bins[::4])
 ax3.set_ylabel("Ratio (b / a)")
-ax3.set_title("Normalised Boundary Interval Distribution\n(Panels b / a)")
+ax3.set_title(f"Normalised Boundary Interval Distribution\n(Panels b / a)\nT-Test: p = {local_time_t_test.pvalue:.1e}")
 
 
 for i, ax in enumerate(axes):

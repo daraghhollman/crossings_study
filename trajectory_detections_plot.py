@@ -89,6 +89,7 @@ for i, ax in enumerate(axes):
     plotting.Square_Axes(ax, 8)
 
 
+"""
 # We then want to get the boundaries from Philpott and plot those positions
 bow_shock_data = philpott_crossings[(philpott_crossings["type"] == "BS_IN") | (philpott_crossings["type"] == "BS_OUT")]
 magnetopause_data = philpott_crossings[(philpott_crossings["type"] == "MP_IN") | (philpott_crossings["type"] == "MP_OUT")]
@@ -129,6 +130,7 @@ xz_axis.plot(
     alpha=0.5,
     zorder=10
 )
+"""
 
 xz_axis.legend(bbox_to_anchor=(-0.1, 1.1), loc="center", ncol=2, borderaxespad=0.5)
 

@@ -66,7 +66,9 @@ class Population_Fit:
         self.pars, self.cov = self.Get_CurveFit()
 
         self.population_a_pars = self.pars[:3]
+        self.population_a_uncertainties = np.sqrt(np.diag(self.cov))[:3]
         self.population_b_pars = self.pars[3:]
+        self.population_b_uncertainties = np.sqrt(np.diag(self.cov))[3:]
 
         # Useful for plotting
         self.x_range = np.linspace(x_values[0], x_values[-1], 1000)
@@ -112,8 +114,8 @@ def Split_Distribution(
             for field_value in distribution_values:
 
                 # Find the likelihood we're in distribution A and B
-                a_likelihood = Single_Gaussian(field_value, *fit.population_a_pars)
-                b_likelihood = Single_Gaussian(field_value, *fit.population_b_pars)
+                a_likelihood = Single_Gaussian(field_value, fit.population_a_pars[0] + 3 * fit.population_a_uncertainties[0], fit.population_a_pars[1] + 3 * fit.population_a_uncertainties[1], fit.population_a_pars[2])
+                b_likelihood = Single_Gaussian(field_value, fit.population_b_pars[0] - 3 * fit.population_b_uncertainties[0], fit.population_b_pars[1] + 3 * fit.population_b_uncertainties[1], fit.population_b_pars[2])
 
                 probability_point_in_a = a_likelihood / (a_likelihood + b_likelihood)
                 probability_point_in_b = b_likelihood / (a_likelihood + b_likelihood)

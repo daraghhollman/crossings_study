@@ -18,7 +18,7 @@ import spiceypy as spice
 
 import bimodal_tools
 
-histogram_parameter = "magnitude"  # options: magnitude, x
+histogram_parameter = "x"  # options: magnitude, x
 fit_curve = True
 split_method = "likelihood"  # none, likelihood, threshold, midpoint, minimum_point
 
@@ -32,8 +32,8 @@ philpott_crossings = boundaries.Load_Crossings(
     "/home/daraghhollman/Main/mercury/philpott_2020_reformatted.csv"
 )
 
-start_time = dt.datetime(year=2011, month=3, day=31, hour=13, minute=35)
-end_time = dt.datetime(year=2011, month=3, day=31, hour=14, minute=15)
+start_time = dt.datetime(year=2013, month=6, day=1, hour=9, minute=55)
+end_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=10)
 
 # 1: LOAD DATA
 data = mag.Load_Between_Dates(root_dir, start_time, end_time)

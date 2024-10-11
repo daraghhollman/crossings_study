@@ -7,14 +7,14 @@ A file to create distributions of the lengths of time between each crossing inte
 With the aim being to find a maxiumum time difference to buffer the boundaries by
 """
 
-from numpy import number
 import hermpy.boundary_crossings as boundaries
 import hermpy.plotting_tools as hermplot
 import matplotlib as mpl
-import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
-import pandas as pd
+import matplotlib.ticker as ticker
 import numpy as np
+import pandas as pd
+from numpy import number
 
 mpl.rcParams["font.size"] = 12
 
@@ -43,16 +43,14 @@ for i in range(len(crossings)):
         case "noon":
             if crossings.iloc[i]["start_x"] < abs(crossings.iloc[i]["start_y"]):
                 continue
-    
 
     try:
         time_to_next_crossing = (
             crossings.iloc[i + 1]["start"] - crossings.iloc[i]["end"]
-        ).total_seconds() / 60 # minutes
+        ).total_seconds() / 60  # minutes
     except:
         # If there are no more crossings, the next crossing doesn't exist. The search is complete!
         continue
-
 
     # We can check which region we are in by looking at the next crossing in the crossing list
     # In doing this, we assume Philpott+ (2020) didn't miss any crossings.
@@ -83,10 +81,12 @@ for i in range(len(crossings)):
 
 
 # Convert to dataframe for ease of use
-crossing_times = pd.DataFrame({
-    "label": region_labels,
-    "length": times,
-})
+crossing_times = pd.DataFrame(
+    {
+        "label": region_labels,
+        "length": times,
+    }
+)
 
 
 # Setup figure
@@ -95,13 +95,18 @@ fig, axes = plt.subplots(1, 3, sharey=True, sharex=True)
 region_options = list(set(region_labels))
 region_options.sort()
 
-bin_length = 15 # minutes
+bin_length = 15  # minutes
 
 for i, ax in enumerate(axes):
-    
+
     data = crossing_times[crossing_times["label"] == region_options[i]]["length"]
 
-    ax.hist(data, bins=np.arange(np.min(data), np.max(data), bin_length), color="k", label=f"Number of passes = {len(data)}")
+    ax.hist(
+        data,
+        bins=np.arange(np.min(data), np.max(data), bin_length),
+        color="k",
+        label=f"Number of passes = {len(data)}",
+    )
 
     ax.set_title(region_options[i])
     ax.set_xlabel("Time To Cross Region [minutes]")
@@ -120,7 +125,7 @@ for i, ax in enumerate(axes):
     ax.margins(0)
 
     ax.legend()
-    
+
     if i == 0:
         ax.set_ylabel("# Region Crossings")
 

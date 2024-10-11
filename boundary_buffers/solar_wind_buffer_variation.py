@@ -6,6 +6,7 @@ import datetime as dt
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import spiceypy as spice
 from hermpy import boundary_crossings, mag, plotting_tools, trajectory
@@ -29,8 +30,8 @@ philpott_crossings = boundary_crossings.Load_Crossings(
 # Specifically, the time segmenet of the centre orbit.
 # We can convert this to minutes before / after apoapsis
 # to look at the same time in other orbits
-start = dt.datetime(year=2014, month=1, day=21, hour=2, minute=15)
-end = dt.datetime(year=2014, month=1, day=21, hour=2, minute=30)
+start = dt.datetime(year=2014, month=1, day=21, hour=10, minute=10)
+end = dt.datetime(year=2014, month=1, day=21, hour=10, minute=40)
 data_length = end - start
 
 data = mag.Load_Between_Dates(root_dir, start, end, strip=True)
@@ -160,8 +161,8 @@ for i, ax in enumerate(trajectory_axes):
     plotting_tools.Square_Axes(ax, 4)
 
 # Defining buffer lengths
-sample_buffer = [0, 10, 20]  # minutes
-sample_length = 10  # minutes
+sample_buffer = [0, 30, 60]  # minutes
+sample_length = 30  # minutes
 
 # We want to sample the distributions of data before and after each boundary.
 # We first find the time of the boundary crossing within the orbit data.
@@ -179,12 +180,21 @@ interval_data = mag.Load_Between_Dates(
     root_dir, current_crossing["start"], current_crossing["end"], strip=True
 )
 
+min_x_values = []
+max_x_values = []
+
+max_y_values = []
+
+bins = 10**(np.arange(0,10, 0.05))
+
+
 for i in range(len(sample_buffer) + 1):
 
     # First histogram is for the data within the boundary interval
     if i == 0:
         hist_data_interval, _, _ = hist_axes[i].hist(
             interval_data["mag_total"],
+            bins=bins,
             color="black",
             density=True,
             label=f"Boundary Interval",
@@ -200,7 +210,7 @@ for i in range(len(sample_buffer) + 1):
             va="top",
             bbox=dict(boxstyle="round", fc="w"),
         )
-
+        
         continue
 
     # We then want to sample at some buffer before or after the boundary, for some length of time
@@ -217,6 +227,7 @@ for i in range(len(sample_buffer) + 1):
 
     sample_hist_data, _, _ = hist_axes[i].hist(
         sample_data["mag_total"],
+        bins=bins,
         color="blue",
         density=True,
         label=f"Solar Wind\n"
@@ -224,14 +235,26 @@ for i in range(len(sample_buffer) + 1):
         + f" = {sample_length} minutes\nN={len(sample_data)}",
     )
 
+    min_x_values.append(np.min(sample_data["mag_total"]))
+    max_x_values.append(np.max(sample_data["mag_total"]))
+
+    max_y_values.append(np.max(sample_hist_data))
+
 
 for i in range(len(hist_axes)):
 
     # Set bottom labels
     if i != 0:
         hist_axes[i].set_xlabel(f"|B| [nT]\n{sample_buffer[i-1]} minutes buffer")
+
+        hist_axes[i].set_ylim(0, np.max(max_y_values))
+
     else:
         hist_axes[i].set_xlabel(f"|B| [nT]")
 
+    hist_axes[i].set_xlim(np.min(min_x_values), np.max(max_x_values + list(interval_data["mag_total"])))
+    hist_axes[i].set_xscale("log")
+
+    #hist_axes[i].xaxis.set_minor_formatter(ticker.ScalarFormatter())
 
 plt.show()

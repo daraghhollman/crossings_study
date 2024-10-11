@@ -20,6 +20,7 @@ import hermpy.boundary_crossings as boundaries
 import hermpy.mag as mag
 import matplotlib as mpl
 import pandas as pd
+import numpy as np
 import spiceypy as spice
 
 mpl.rcParams["font.size"] = 15
@@ -36,13 +37,10 @@ mission_end = dt.datetime(year=2012, month=6, day=2)
 # 1: LOAD DATA
 # Here it would take too long to adjust for aberration
 data = mag.Load_Between_Dates(root_dir, mission_start, mission_end)
-data = mag.Add_Field_Variability(data, dt.timedelta(seconds=20))
+data = mag.Strip_Data(data, mission_start, mission_end)
+# data = mag.Add_Field_Variability(data, dt.timedelta(seconds=20), multiprocess=False)
 
-print(data["mag_variability"])
-
-raise Exception("Stop")
-
-region_data = pd.DataFrame(columns=["region", "mag_total", "mag_x", "mag_y", "mag_z"])
+region_data = pd.DataFrame(columns=["region", "mag_total", "mag_x", "mag_y", "mag_z", "mag_variability"])
 
 # Check if we are sufficiently close to the bondaries
 boundary_distance = dt.timedelta(minutes=5)
@@ -104,6 +102,7 @@ def Add_Data_Row(row):
         row["mag_x"],
         row["mag_y"],
         row["mag_z"],
+        row["mag_variability"]
     ]
     return region_dict
 
@@ -121,4 +120,4 @@ with multiprocessing.Pool() as pool:
 
 
 # Save to csv
-region_data.to_csv(f"./region_data_{int(boundary_distance.total_seconds() / 60)}_mins.csv")
+region_data.to_csv(f"./region_data_{int(len(data) / 3600 / 24)}_{int(boundary_distance.total_seconds() / 60)}_mins.csv")

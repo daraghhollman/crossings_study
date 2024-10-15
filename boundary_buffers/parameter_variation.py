@@ -4,16 +4,12 @@ Script to plot how different parameters of the solar wind distribution change as
 
 import datetime as dt
 import multiprocessing
-from math import dist
 
 import hermpy.boundary_crossings as boundaries
 import hermpy.mag as mag
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.signal
-from pandas._libs.parsers import DEFAULT_BUFFER_HEURISTIC
-from tqdm import tqdm
 
 mpl.rcParams["font.size"] = 12
 root_dir = "/home/daraghhollman/Main/data/mercury/messenger/mag/avg_1_second/"
@@ -25,7 +21,7 @@ sector = {
 }
 
 crossings = boundaries.Load_Crossings(
-    "/home/daraghhollman/Main/mercury/philpott_2020_reformatted.csv"
+    "/home/daraghhollman/Main/Work/mercury/philpott_2020_reformatted.csv"
 )
 
 # Filter crossings list by hemisphere
@@ -78,11 +74,11 @@ match sector["boundary"]:
 # and at increasing time buffers.
 # We then determine some parameters for these distributions and plot them.
 
-buffers = [dt.timedelta(minutes=int(i)) for i in np.arange(0, 120, 1)]  # minutes
+buffers = [dt.timedelta(minutes=int(i)) for i in np.arange(0, 20, 1)]  # minutes
 sample_length = dt.timedelta(minutes=10)  # minutes
 
 # shorten crossings to test with
-#crossings = crossings.iloc[0 : int(len(crossings) / 40)]
+# crossings = crossings.iloc[0 : int(len(crossings) / 40)]
 
 overall_means = []
 overall_medians = []
@@ -134,7 +130,7 @@ with multiprocessing.Pool() as pool:
 
 titles = ["mean [nT]", "median [nT]", "std [nT]"]
 items_to_plot = [overall_means, overall_medians, overall_stds]
-fig, axes = plt.subplots(1, len(titles), sharey=True)
+fig, axes = plt.subplots(1, len(titles))
 
 for i, (ax, items) in enumerate(zip(axes, items_to_plot)):
     for j in range(len(items)):
@@ -145,16 +141,38 @@ for i, (ax, items) in enumerate(zip(axes, items_to_plot)):
             color="black",
             alpha=0.2,
         )
+
     ax.plot(
         [k.total_seconds() / 60 for k in buffers],
         np.median(items, axis=0),
         color="magenta",
-        label="median"
+        label="median",
+    )
+    ax.plot(
+        [k.total_seconds() / 60 for k in buffers],
+        np.mean(items, axis=0),
+        color="magenta",
+        ls="dashed",
+        label="mean",
     )
 
+    ax.annotate(
+        f"N={len(items)}",
+        xy=(1, 1),
+        xycoords="axes fraction",
+        size=10,
+        ha="right",
+        va="top",
+        bbox=dict(boxstyle="round", fc="w"),
+    )
+
+    ax.margins(0)
     ax.set_xlabel("Boundary Interval Buffer [mins]")
-    ax.set_ylabel(titles[i])
+    ax.set_title(titles[i])
     ax.legend()
+
+    if i == 0:
+        ax.set_ylabel("|B| [nT]")
 
 
 plt.show()

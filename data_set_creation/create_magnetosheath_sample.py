@@ -60,8 +60,8 @@ def Get_Sample(row):
     sample = mag.Load_Between_Dates(root_dir, sample_start, sample_end, strip=True)
 
 
-    sample_position = [sample["eph_x"], sample["eph_y"], sample["eph_z"]]
-    sample_middle_position = sample_position[len(sample_position) // 2]
+    sample_middle = sample.iloc[round(len(sample) / 2)]
+    sample_middle_position = np.array([sample_middle["eph_x"], sample_middle["eph_y"], sample_middle["eph_z"]])
 
     # convert to radii from km
     sample_middle_position /= 2439.7

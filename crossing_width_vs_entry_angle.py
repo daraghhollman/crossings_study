@@ -9,6 +9,7 @@ import hermpy.trajectory as traj
 import numpy as np
 import spiceypy as spice
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import scipy.stats
 
 spice.furnsh("/home/daraghhollman/Main/SPICE/messenger/metakernel_messenger.txt")
@@ -20,19 +21,14 @@ crossings = boundaries.Load_Crossings(
 )
 
 # Limit only to bow shock crossings
-"""
 crossings = crossings.loc[
     (crossings["type"] == "BS_OUT") | (crossings["type"] == "BS_IN")
-]
-"""
-crossings = crossings.loc[
-    (crossings["type"] == "BS_IN")
 ]
 
 
 # Get the time difference between the start and the stop
 def Get_Crossing_Width(row):
-    return (row["end"] - row["start"]).total_seconds() / 3600 # hours
+    return (row["end"] - row["start"]).total_seconds() / 60 # minutes
 
 
 crossings["dt"] = crossings.apply(Get_Crossing_Width, axis=1)
@@ -42,9 +38,9 @@ crossings["dt"] = crossings.apply(Get_Crossing_Width, axis=1)
 def Get_Surface_Angle(row):
 
     # Get position at start of crossing
-    start_position = traj.Get_Position("MESSENGER", row["start"])
+    start_position = traj.Get_Position("MESSENGER", row["start"], frame="MSM")
     next_position = traj.Get_Position(
-        "MESSENGER", row["start"] + dt.timedelta(seconds=1)
+        "MESSENGER", row["start"] + dt.timedelta(seconds=1), frame="MSM"
     )
 
     velocity = next_position - start_position
@@ -88,41 +84,54 @@ def Get_Surface_Angle(row):
 
     # Get the normal vector of the BS at this point
     # This is just the normalised vector between the spacecraft and the closest point
-    normal_vector = start_position - bow_shock_positions[closest_position]
+    normal_vector = bow_shock_positions[closest_position] - start_position
     normal_vector = normal_vector / np.sqrt(np.sum(normal_vector**2))
 
-    # If the crossing is inbound, the normal should point outwards
-    if row["type"] == "BS_IN":
-        if normal_vector[0] < 0:
-            normal_vector = - normal_vector
-
-    # If the crossing is outbound, the normal should point inwards
-    elif row["type"] == "BS_OUT":
-        if normal_vector[0] > 0:
-            normal_vector = - normal_vector
-
     grazing_angle = np.arccos(
-        np.dot(normal_vector, - velocity)
+        np.dot(normal_vector, velocity)
         / (np.sqrt(np.sum(normal_vector**2)) + np.sqrt(np.sum(velocity**2)))
-    )
+    ) * 180 / np.pi
 
-    return grazing_angle * 180 / np.pi
+    # If the grazing angle is greater than 90, then we take 180 - angle as its from the other side
+    # This occurs as we don't make an assumption as to what side of the model boundary we are
+
+    if grazing_angle > 90:
+        grazing_angle = 180 - grazing_angle
+
+    return grazing_angle
 
 
 crossings["grazing angle"] = crossings.apply(Get_Surface_Angle, axis=1)
 
-print(crossings.loc[crossings["grazing angle"] > 100])
 
 correlation = scipy.stats.pearsonr(crossings["grazing angle"], crossings["dt"])
-print(correlation)
 
 fig, ax = plt.subplots()
 
-ax.scatter(crossings["grazing angle"], crossings["dt"], c="k", alpha=0.05)
+# ax.scatter(crossings["grazing angle"], crossings["dt"], c="k", alpha=0.01)
+heatmap, x_edges, y_edges = np.histogram2d(crossings["grazing angle"], crossings["dt"], bins=50)
+extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]]
+
+image = ax.imshow(heatmap.T, extent=extent, origin="lower", norm="log", aspect="auto")
+
+ax_divider = make_axes_locatable(ax)
+cax = ax_divider.append_axes("right", size="5%", pad="2%")
+
+fig.colorbar(image, cax=cax, label="Num. Crossings")
 
 ax.set_xlabel("Grazing Angle [deg.]")
-ax.set_ylabel("Crossing Interval Legnth [hours]")
+ax.set_ylabel("Crossing Interval Legnth [minutes]")
 
+ax.annotate(
+    f"Pearson R = {correlation[0]:.2f}",
+    xy=(1,1),
+    xycoords="axes fraction",
+    size=10,
+    ha="right",
+    va="top",
+    bbox=dict(boxstyle="round", fc="w"),
+)
 
-# WHY DO WE SEE POINTS OVER 120 deg?????
+ax.margins(0)
+
 plt.show()

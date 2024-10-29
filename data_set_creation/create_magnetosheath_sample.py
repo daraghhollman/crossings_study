@@ -113,7 +113,7 @@ magnetosheath_samples = []
 # Iterrate through the crossings
 count = 0
 process_items = [row for _, row in crossings.iterrows()]
-with multiprocessing.Pool() as pool:
+with multiprocessing.Pool(int(input("# of cores? "))) as pool:
     for result in pool.imap(Get_Sample, process_items):
 
 

@@ -96,14 +96,17 @@ def Get_Sample(row):
         "B_y": sample["mag_y"].tolist(),
         "B_z": sample["mag_z"].tolist(),
 
-        # The mean local time of the sample
+        # The median local time of the sample
         "LT": local_time,
-
-        # The mean latitude of the sample
+        # The median latitude of the sample
         "Lat": latitude,
-
-        # The mean magnetic latitude of the sample
+        # The median magnetic latitude of the sample
         "MLat": magnetic_latitude,
+
+        # Median Spacecraft position
+        "x_msm": sample_middle_position[0],
+        "y_msm": sample_middle_position[1],
+        "z_msm": sample_middle_position[2] + (479 / 2439.7),
     }
 
 

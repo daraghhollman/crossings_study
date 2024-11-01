@@ -6,6 +6,8 @@ import datetime as dt
 
 import hermpy.boundary_crossings as boundaries
 import hermpy.trajectory as traj
+import hermpy.mag as mag
+import hermpy.plotting_tools as hermplot
 import numpy as np
 import spiceypy as spice
 import matplotlib.pyplot as plt
@@ -103,35 +105,66 @@ def Get_Surface_Angle(row):
 
 crossings["grazing angle"] = crossings.apply(Get_Surface_Angle, axis=1)
 
+# Remove outliers
+crossings = crossings[np.abs(scipy.stats.zscore(crossings["dt"])) < 3]
 
 correlation = scipy.stats.pearsonr(crossings["grazing angle"], crossings["dt"])
 
-fig, ax = plt.subplots()
 
-# ax.scatter(crossings["grazing angle"], crossings["dt"], c="k", alpha=0.01)
-heatmap, x_edges, y_edges = np.histogram2d(crossings["grazing angle"], crossings["dt"], bins=50)
+
+fig, image_axis = plt.subplots()
+
+
+heatmap, x_edges, y_edges = np.histogram2d(crossings["grazing angle"], crossings["dt"], bins=30)
 extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]]
 
-image = ax.imshow(heatmap.T, extent=extent, origin="lower", norm="log", aspect="auto")
+image = image_axis.imshow(heatmap.T, extent=extent, origin="lower", norm="log", aspect="auto")
 
-ax_divider = make_axes_locatable(ax)
-cax = ax_divider.append_axes("right", size="5%", pad="2%")
+ax1_divider = make_axes_locatable(image_axis)
+cax = ax1_divider.append_axes("right", size="5%", pad="2%")
 
 fig.colorbar(image, cax=cax, label="Num. Crossings")
 
-ax.set_xlabel("Grazing Angle [deg.]")
-ax.set_ylabel("Crossing Interval Legnth [minutes]")
+image_axis.set_ylabel("Crossing Interval Length [minutes]")
+image_axis.set_xlabel("Grazing Angle [deg.]")
 
-ax.annotate(
-    f"Pearson R = {correlation[0]:.2f}",
-    xy=(1,1),
-    xycoords="axes fraction",
-    size=10,
-    ha="right",
-    va="top",
-    bbox=dict(boxstyle="round", fc="w"),
-)
+image_axis.margins(0)
 
-ax.margins(0)
 
 plt.show()
+
+
+"""
+fig, (image_axis, line_axis) = plt.subplots(2, 1, height_ratios=[3, 1], sharex=True)
+
+
+heatmap, x_edges, y_edges = np.histogram2d(crossings["grazing angle"], crossings["dt"], bins=20)
+extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]]
+
+image = image_axis.imshow(heatmap.T, extent=extent, origin="lower", norm="log", aspect="auto")
+
+ax1_divider = make_axes_locatable(image_axis)
+cax = ax1_divider.append_axes("right", size="5%", pad="2%")
+ax2_divider = make_axes_locatable(line_axis)
+_ = ax2_divider.append_axes("right", size="5%", pad="2%")
+_.axis("off")
+
+fig.colorbar(image, cax=cax, label="Num. Crossings")
+
+image_axis.set_ylabel("Crossing Interval Length [minutes]")
+line_axis.set_ylabel("Column Standard Deviation")
+line_axis.set_xlabel("Grazing Angle [deg.]")
+
+image_axis.margins(0)
+line_axis.margins(0)
+
+
+### Standard deviation of columns as a function of grazing angle
+standard_deviations = scipy.stats.std(heatmap, axis=0)
+
+x_centres = (x_edges[:-1] + x_edges[1:]) / 2
+line_axis.plot(x_centres, standard_deviations)
+
+
+plt.show()
+"""

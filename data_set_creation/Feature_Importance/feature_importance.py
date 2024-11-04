@@ -14,15 +14,15 @@ y = combined_features["label"]  # Target
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-rf = RandomForestClassifier()  # or RandomForestRegressor()
-rf.fit(X_train, y_train)
+random_forest = RandomForestClassifier()
+random_forest.fit(X_train, y_train)
 
-y_pred = rf.predict(X_test)
+y_pred = random_forest.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 print(f'Accuracy: {accuracy:.3f}')
 
 
-importances = rf.feature_importances_
+importances = random_forest.feature_importances_
 feature_names = X.columns
 
 # Create a DataFrame for visualization

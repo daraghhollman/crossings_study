@@ -18,9 +18,11 @@ import spiceypy as spice
 
 import bimodal_tools
 
-histogram_parameter = "x"  # options: magnitude, x
-fit_curve = True
-split_method = "likelihood"  # none, likelihood, threshold, midpoint, minimum_point
+histogram_parameter = "magnitude"  # options: magnitude, x
+fit_curve = False
+split_method = "none"  # none, likelihood, threshold, midpoint, minimum_point
+
+save = False
 
 
 # PARAMETERS
@@ -29,11 +31,11 @@ root_dir = "/home/daraghhollman/Main/data/mercury/messenger/mag/avg_1_second/"
 metakernel = "/home/daraghhollman/Main/SPICE/messenger/metakernel_messenger.txt"
 spice.furnsh(metakernel)
 philpott_crossings = boundaries.Load_Crossings(
-    "/home/daraghhollman/Main/mercury/philpott_2020_reformatted.csv"
+    "/home/daraghhollman/Main/Work/mercury/philpott_2020_reformatted.csv"
 )
 
-start_time = dt.datetime(year=2013, month=6, day=1, hour=9, minute=55)
-end_time = dt.datetime(year=2013, month=6, day=1, hour=10, minute=10)
+start_time = dt.datetime(year=2012, month=2, day=2, hour=17, minute=35)
+end_time = dt.datetime(year=2012, month=2, day=2, hour=18, minute=0)
 
 # 1: LOAD DATA
 data = mag.Load_Between_Dates(root_dir, start_time, end_time)
@@ -235,7 +237,10 @@ if fit_curve:
     histogram_axis.legend()
 
 
-plt.savefig(
-    f"/home/daraghhollman/Main/mercury/Figures/bimodal/bimodal_{start_time.strftime("%Y_%m_%d__%H_%M_%S")}_{end_time.strftime("%Y_%m_%d__%H_%M_%S")}.png",
-    dpi=300,
-)
+if save:
+    plt.savefig(
+        f"/home/daraghhollman/Main/mercury/Figures/bimodal/bimodal_{start_time.strftime("%Y_%m_%d__%H_%M_%S")}_{end_time.strftime("%Y_%m_%d__%H_%M_%S")}.png",
+        dpi=300,
+    )
+else:
+    plt.show()

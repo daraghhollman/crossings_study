@@ -10,7 +10,7 @@ import pandas as pd
 import scipy.stats
 
 # Load samples csv 
-samples_data_set = pd.read_csv("./solar_wind_sample_10_mins.csv")
+samples_data_set = pd.read_csv("./magnetosheath_sample_10_mins.csv")
 
 # Fix loading issues to do with an element being a series itself
 samples_data_set["|B|"] = samples_data_set["|B|"].apply(lambda x: list(map(float, x.strip("[]").split(','))))
@@ -44,6 +44,7 @@ def Get_Features(row):
         "std": std,
         "skew": skew,
         "kurtosis": kurtosis,
+        "RH": row["RH"],
         "LT": row["LT"],
         "Lat": row["Lat"],
         "MLat": row["MLat"],
@@ -77,4 +78,4 @@ features_data_set = pd.DataFrame(features_data)
 
 print("")
 
-features_data_set.to_csv(f"./solar_wind_features.csv")
+features_data_set.to_csv(f"./magnetosheath_features.csv")

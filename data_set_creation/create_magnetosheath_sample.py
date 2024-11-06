@@ -114,6 +114,7 @@ def Get_Sample(row):
 magnetosheath_samples = []
 
 # Iterrate through the crossings
+heliocentric_distances = []
 count = 0
 process_items = [row for _, row in crossings.iterrows()]
 with multiprocessing.Pool(int(input("# of cores? "))) as pool:
@@ -124,6 +125,14 @@ with multiprocessing.Pool(int(input("# of cores? "))) as pool:
             # Add row dictionary to list
             magnetosheath_samples.append(result)
 
+            sample_middle = result["sample_start"] + (result["sample_end"] - result["sample_start"]) / 2
+            et = spice.str2et(sample_middle.strftime("%Y-%m-%d %H:%M:%S"))
+            mercury_position, _ = spice.spkpos("MERCURY", et, "J2000", "NONE", "SUN")
+
+            heliocentric_distance = np.sqrt(mercury_position[0] ** 2 + mercury_position[1] ** 2 + mercury_position[2] ** 2)
+
+            heliocentric_distances.append(heliocentric_distance)
+
 
         count += 1
         print(f"{count} / {len(crossings)}", end="\r")
@@ -131,6 +140,7 @@ with multiprocessing.Pool(int(input("# of cores? "))) as pool:
 
 # Create dataframe from solar wind samples
 magnetosheath_samples = pd.DataFrame(magnetosheath_samples)
+magnetosheath_samples["RH"] = heliocentric_distances
 
 print("")
 

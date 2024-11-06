@@ -8,7 +8,9 @@ ms_features = pd.read_csv(
     "/home/daraghhollman/Main/Work/mercury/Code/crossings_study/data_set_creation/magnetosheath_features.csv"
 )
 
-features = ["mean", "median", "std", "skew", "kurtosis", "LT", "Lat", "MLat", "x_msm", "y_msm", "z_msm"]
+print(ms_features.columns)
+
+features = ["mean", "median", "std", "skew", "kurtosis", "RH", "LT", "Lat", "MLat", "x_msm", "y_msm", "z_msm"]
 expanded_feature_labels = ["|B|", "Bx", "By", "Bz"]
 
 # Select only the columns we want to keep
@@ -39,7 +41,5 @@ sw_features["label"] = "Solar Wind"
 ms_features["label"] = "Magnetosheath"
 
 combined_features = pd.concat([sw_features, ms_features], ignore_index=True)
-
-print(combined_features.columns)
 
 combined_features.to_csv("./combined_features.csv")

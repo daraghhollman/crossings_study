@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import hermpy.boundary_crossings as boundaries
 import hermpy.mag as mag
+import hermpy.trajectory as traj
 import spiceypy as spice
 
 spice.furnsh("/home/daraghhollman/Main/SPICE/messenger/metakernel_messenger.txt")
@@ -56,6 +57,7 @@ def Get_Sample(row):
 
     # convert to radii from km
     sample_middle_position /= 2439.7
+
 
     longitude = np.arctan2(sample_middle_position[1], sample_middle_position[0]) * 180 / np.pi
 
@@ -105,6 +107,7 @@ def Get_Sample(row):
 solar_wind_samples = []
 
 # Iterrate through the crossings
+heliocentric_distances = []
 count = 0
 process_items = [row for _, row in crossings.iterrows()]
 with multiprocessing.Pool() as pool:
@@ -115,6 +118,14 @@ with multiprocessing.Pool() as pool:
             # Add row dictionary to list
             solar_wind_samples.append(result)
 
+            sample_middle = result["sample_start"] + (result["sample_end"] - result["sample_start"]) / 2
+            et = spice.str2et(sample_middle.strftime("%Y-%m-%d %H:%M:%S"))
+            mercury_position, _ = spice.spkpos("MERCURY", et, "J2000", "NONE", "SUN")
+
+            heliocentric_distance = np.sqrt(mercury_position[0] ** 2 + mercury_position[1] ** 2 + mercury_position[2] ** 2)
+
+            heliocentric_distances.append(heliocentric_distance)
+
 
         count += 1
         print(f"{count} / {len(crossings)}", end="\r")
@@ -122,6 +133,7 @@ with multiprocessing.Pool() as pool:
 
 # Create dataframe from solar wind samples
 solar_wind_samples = pd.DataFrame(solar_wind_samples)
+solar_wind_samples["RH"] = heliocentric_distances
 
 print("")
 

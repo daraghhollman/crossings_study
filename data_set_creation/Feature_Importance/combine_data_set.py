@@ -8,9 +8,7 @@ ms_features = pd.read_csv(
     "/home/daraghhollman/Main/Work/mercury/Code/crossings_study/data_set_creation/magnetosheath_features.csv"
 )
 
-print(ms_features.columns)
-
-features = ["mean", "median", "std", "skew", "kurtosis", "RH", "LT", "Lat", "MLat", "x_msm", "y_msm", "z_msm"]
+features = ["mean", "median", "std", "skew", "kurtosis", "dip_stat", "dip_p_value", "grazing_angle", "RH", "LT", "Lat", "MLat", "x_msm", "y_msm", "z_msm", "is_inbound"]
 expanded_feature_labels = ["|B|", "Bx", "By", "Bz"]
 
 # Select only the columns we want to keep
@@ -19,7 +17,7 @@ ms_features = ms_features[features].copy()
 
 # Process each dataset
 for dataset in [sw_features, ms_features]:
-    for feature in features[0:5]:
+    for feature in features[0:7]:
 
         # Convert elements from list-like strings to lists of floats
         dataset[feature] = dataset[feature].apply(
@@ -35,7 +33,7 @@ for dataset in [sw_features, ms_features]:
         dataset[expanded_columns.columns] = expanded_columns
 
     # Drop original feature columns
-    dataset.drop(columns=features[0:5], inplace=True)
+    dataset.drop(columns=features[0:7], inplace=True)
 
 sw_features["label"] = "Solar Wind"
 ms_features["label"] = "Magnetosheath"

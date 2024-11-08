@@ -71,7 +71,7 @@ boundaries.Plot_Crossing_Intervals(
     data["date"].iloc[0],
     data["date"].iloc[-1],
     crossings.loc[ (crossings["type"] == "BS_IN") | (crossings["type"] == "BS_OUT") ],
-    color="black",
+    color="grey",
     lw=1.5,
     label=False
 )

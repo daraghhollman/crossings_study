@@ -4,16 +4,17 @@ Plot a mag planel and trajectory panels for a given time. Overplot the boundary 
 
 import datetime as dt
 
-from matplotlib import ticker
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import numpy as np
-import hermpy.mag as mag
-import hermpy.trajectory as traj
-import hermpy.fips as fips
 import hermpy.boundary_crossings as boundaries
+import hermpy.fips as fips
+import hermpy.mag as mag
 import hermpy.plotting_tools as hermplot
+import hermpy.trajectory as traj
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
 import spiceypy as spice
+from matplotlib import ticker
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
 colours = ["#648FFF", "#785EF0", "#DC267F", "#FE6100", "#FFB000"]
 
@@ -21,12 +22,12 @@ spice.furnsh("/home/daraghhollman/Main/SPICE/messenger/metakernel_messenger.txt"
 
 # Load the crossing intervals
 crossings = boundaries.Load_Crossings(
-    "/home/daraghhollman/Main/Work/mercury/philpott_2020_reformatted.csv"
+    "/home/daraghhollman/Main/Work/mercury/DataSets/philpott_2020_reformatted.csv"
 )
 
 start = dt.datetime(year=2012, month=5, day=28, hour=0, minute=0)
 end = dt.datetime(year=2012, month=5, day=30, hour=23, minute=59)
-    
+
 data = mag.Load_Between_Dates(
     "/home/daraghhollman/Main/data/mercury/messenger/mag/avg_1_second/",
     start,
@@ -61,19 +62,19 @@ boundaries.Plot_Crossing_Intervals(
     mag_axis,
     data["date"].iloc[0],
     data["date"].iloc[-1],
-    crossings.loc[ (crossings["type"] == "MP_IN") | (crossings["type"] == "MP_OUT") ],
+    crossings.loc[(crossings["type"] == "MP_IN") | (crossings["type"] == "MP_OUT")],
     color=colours[3],
     lw=1.5,
-    label=False
+    label=False,
 )
 boundaries.Plot_Crossing_Intervals(
     mag_axis,
     data["date"].iloc[0],
     data["date"].iloc[-1],
-    crossings.loc[ (crossings["type"] == "BS_IN") | (crossings["type"] == "BS_OUT") ],
+    crossings.loc[(crossings["type"] == "BS_IN") | (crossings["type"] == "BS_OUT")],
     color="black",
     lw=1.5,
-    label=False
+    label=False,
 )
 
 # Format the panels
@@ -84,7 +85,9 @@ mag_axis.set_ylabel("Magnetic Field Strength [nT]")
 
 # FIPS!
 
-fips_data = fips.Load_Between_Dates("/home/daraghhollman/Main/data/mercury/messenger/FIPS/", start, end, strip=True)
+fips_data = fips.Load_Between_Dates(
+    "/home/daraghhollman/Main/data/mercury/messenger/FIPS/", start, end, strip=True
+)
 
 # We transpose to place the time axis along x
 protons = np.transpose(fips_data["proton_energies"])
@@ -104,12 +107,11 @@ protons_mesh = fips_axis.pcolormesh(
 )
 
 colorbar_label = "Diff. Energy Flux\n[(keV/e)$^{-1}$ sec$^{-1}$ cm$^{-2}$]"
-# plt.colorbar(protons_mesh, ax=fips_axis, label="Proton " + colorbar_label)
 
 # hermplot.Add_Tick_Ephemeris(fips_axis)
-fips_axis.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
-for label in fips_axis.get_xticklabels(which='major'):
-    label.set(rotation=30, horizontalalignment='right')
+fips_axis.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
+for label in fips_axis.get_xticklabels(which="major"):
+    label.set(rotation=30, horizontalalignment="right")
 
 
 for ax in [mag_axis, fips_axis]:
@@ -121,6 +123,16 @@ for ax in [mag_axis, fips_axis]:
 
 fips_axis.set_ylabel("E/Q [keV/Q]")
 fips_axis.set_yscale("log")
+
+# Add new axes to right, and plot fips colourbar
+
+# Add an Axes to the right of the main Axes.
+_ = make_axes_locatable(mag_axis).append_axes("right", size="2%", pad="1%")
+_.set_axis_off()
+
+cax = make_axes_locatable(fips_axis).append_axes("right", size="2%", pad="1%")
+
+plt.colorbar(protons_mesh, cax=cax, label="Proton " + colorbar_label)
 
 plt.tight_layout()
 plt.show()

@@ -14,6 +14,7 @@ import hermpy.fips as fips
 import hermpy.boundary_crossings as boundaries
 import hermpy.plotting_tools as hermplot
 import spiceypy as spice
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
 colours = ["#648FFF", "#785EF0", "#DC267F", "#FE6100", "#FFB000"]
 
@@ -21,7 +22,7 @@ spice.furnsh("/home/daraghhollman/Main/SPICE/messenger/metakernel_messenger.txt"
 
 # Load the crossing intervals
 crossings = boundaries.Load_Crossings(
-    "/home/daraghhollman/Main/Work/mercury/philpott_2020_reformatted.csv"
+    "/home/daraghhollman/Main/Work/mercury/DataSets/philpott_2020_reformatted.csv"
 )
 
 start = dt.datetime(year=2014, month=10, day=15, hour=0, minute=0)
@@ -104,12 +105,11 @@ protons_mesh = fips_axis.pcolormesh(
 )
 
 colorbar_label = "Diff. Energy Flux\n[(keV/e)$^{-1}$ sec$^{-1}$ cm$^{-2}$]"
-# plt.colorbar(protons_mesh, ax=fips_axis, label="Proton " + colorbar_label)
 
 # hermplot.Add_Tick_Ephemeris(fips_axis)
-fips_axis.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
-for label in fips_axis.get_xticklabels(which='major'):
-    label.set(rotation=30, horizontalalignment='right')
+fips_axis.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d %H:%M"))
+for label in fips_axis.get_xticklabels(which="major"):
+    label.set(rotation=30, horizontalalignment="right")
 
 
 for ax in [mag_axis, fips_axis]:
@@ -121,6 +121,16 @@ for ax in [mag_axis, fips_axis]:
 
 fips_axis.set_ylabel("E/Q [keV/Q]")
 fips_axis.set_yscale("log")
+
+# Add new axes to right, and plot fips colourbar
+
+# Add an Axes to the right of the main Axes.
+_ = make_axes_locatable(mag_axis).append_axes("right", size="2%", pad="1%")
+_.set_axis_off()
+
+cax = make_axes_locatable(fips_axis).append_axes("right", size="2%", pad="1%")
+
+plt.colorbar(protons_mesh, cax=cax, label="Proton " + colorbar_label)
 
 plt.tight_layout()
 plt.show()

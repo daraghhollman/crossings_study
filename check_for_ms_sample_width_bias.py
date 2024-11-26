@@ -35,20 +35,35 @@ magnetosheath_samples["|B|"] = magnetosheath_samples["|B|"].apply(
     lambda x: list(map(float, x.strip("[]").split(",")))
 )
 
+
+# Limit just to the nose
+"""
+local_time_filter_indices = (
+    (solar_wind_samples["LT"] > 11) & (solar_wind_samples["LT"] < 13)
+) & ((magnetosheath_samples["LT"] > 11) & (magnetosheath_samples["LT"] < 13))
+
+solar_wind_samples = solar_wind_samples[local_time_filter_indices]
+solar_wind_features = solar_wind_features[local_time_filter_indices]
+
+magnetosheath_samples = magnetosheath_samples[local_time_filter_indices]
+magnetosheath_features = magnetosheath_features[local_time_filter_indices]
+"""
+
+
 indices_to_keep = []
 # loop through the crossings
 for i in range(len(solar_wind_samples)):
 
     magnetosheath_length = len(magnetosheath_samples.iloc[i]["|B|"])
 
-    if magnetosheath_length >= 600:
+    if magnetosheath_length < 600:
         indices_to_keep.append(i)
 
 # First plot the distribution of grazing angle, and IMF |B| for all crossings
 fig, axes = plt.subplots(1, 2, sharey=True)
 
 # Remove outliers
-grazing_angle_bins = np.arange(0, np.max(solar_wind_features["grazing_angle"]) + 1, 1)
+grazing_angle_bins = np.arange(0, np.max(solar_wind_features["grazing_angle"]) + 1, 2)
 mean_imf_bins = np.arange(0, np.max(solar_wind_features["Mean IMF |B|"]) + 2, 2)
 
 axes[0].hist(
@@ -87,7 +102,7 @@ axes[0].set_ylabel("fraction of bow shock crossings per bin")
 axes[1].set_xlabel("Mean IMF |B|")
 
 axes[0].annotate(
-    f"N (all) = {len(solar_wind_features)}\nN (filtered) = {len(solar_wind_features.iloc[indices_to_keep])}",
+    f"N (all) = {len(solar_wind_features)}\nN (< 10 mins) = {len(solar_wind_features.iloc[indices_to_keep])}",
     xy=(1, 1),
     xycoords="axes fraction",
     size=10,
@@ -111,7 +126,7 @@ axes[1].hist(
     density=True,
     color="cornflowerblue",
     alpha=0.5,
-    label="Filtered",
+    label="Δt < 10 mins",
 )
 
 axes[1].legend()

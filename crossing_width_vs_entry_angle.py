@@ -2,84 +2,123 @@
 Script to plot the width of a BS crossing interval to the angle the entry trajectory makes with the surface normal
 """
 
-import multiprocessing
-import functools
+import datetime as dt
 
-import hermpy.boundary_crossings as boundaries
 import hermpy.trajectory as traj
-from hermpy.utils import User
-
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 import scipy.stats
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+
 
 def main():
-    # Load the crossing intervals
-    crossings = boundaries.Load_Crossings(User.CROSSING_LISTS["Philpott"])
 
-    # Limit only to bow shock crossings
-    crossings = crossings.loc[
-        (crossings["Type"] == "BS_OUT") | (crossings["Type"] == "BS_IN")
-    ]
+    normalise_by_spacecraft_speed = True
+
+    # Load the grazing angles
+    print("Loading grazing angles...")
+    crossings = pd.read_csv(
+        "/home/daraghhollman/Main/Work/mercury/DataSets/philpott_grazing_angles.csv",
+        parse_dates=["Start Time", "End Time"],
+    )
 
     # Get the time difference between the start and the stop
-    crossings["dt"] = crossings.apply(Get_Crossing_Width, axis=1)
+    # crossings["dt"] = crossings.apply(Get_Crossing_Width, axis=1)
+    print("Finding crossing interval lengths")
+    crossings["dt"] = [
+        t.total_seconds() / 60
+        for t in (crossings["End Time"] - crossings["Start Time"]).tolist()
+    ]  # minutes
 
-    # Get the angle between the trajectory and the bs normal
-    crossings["grazing angle"] = Parallelised_Apply(crossings, traj.Get_Grazing_Angle, int(input("Choose # cores: ")))
+    if normalise_by_spacecraft_speed:
 
-    # non-parallel version
-    # crossings["grazing angle"] = crossings.apply(traj.Get_Grazing_Angle, axis=1)
+        # Precompute positions:
+        print("Precomputing positions")
+        midpoint_times = (
+            crossings["Start Time"]
+            + (crossings["End Time"] - crossings["Start Time"]) / 2
+        ).tolist()
+        next_times = (
+            crossings["Start Time"]
+            + dt.timedelta(seconds=1)
+            + (crossings["End Time"] - crossings["Start Time"]) / 2
+        ).tolist()
 
-    # Remove outliers
-    crossings = crossings[np.abs(scipy.stats.zscore(crossings["dt"])) < 3]
-    crossings = crossings[np.abs(scipy.stats.zscore(crossings["grazing angle"])) < 3]
+        positions = traj.Get_Position(
+            "MESSENGER", midpoint_times, frame="MSO", aberrate=False
+        )
+        next_positions = traj.Get_Position(
+            "MESSENGER", next_times, frame="MSO", aberrate=False
+        )
 
+        print("Finding spacecraft velocity")
+        velocities = next_positions - positions
+        speeds = np.sqrt(np.sum(velocities**2, axis=1))  # km/s
 
-    fig, image_axis = plt.subplots()
+        crossings["speed"] = speeds
 
-    heatmap, x_edges, y_edges = np.histogram2d(crossings["grazing angle"], crossings["dt"], bins=30)
-    extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]]
+        print("Normalising crossing length by velocity")
+        crossings["distance"] = (
+            crossings["dt"] * 60 * crossings["speed"]
+        )  # multiply minutes by 60 to get seconds
 
-    image = image_axis.imshow(heatmap.T, extent=extent, origin="lower", norm="log", aspect="auto")
+        # Set plotting params
+        y_label = "Crossing Path Distance [km]"
+        y_variable = "distance"
+        degrees_bin_size = 2
+        y_bin_size = 200  # km
 
-    ax1_divider = make_axes_locatable(image_axis)
-    cax = ax1_divider.append_axes("right", size="5%", pad="2%")
+    else:
+        y_label = "Crossing Interval Length [minutes]"
+        y_variable = "dt"
+        degrees_bin_size = 2
+        y_bin_size = 2  # minutes
 
-    fig.colorbar(image, cax=cax, label="Num. Crossings")
+    # remove outliers
+    sigma = 5
+    crossings = crossings.loc[
+        (np.abs(scipy.stats.zscore(crossings[y_variable])) < sigma)
+    ]
 
-    image_axis.set_ylabel("Crossing Interval Length [minutes]")
-    image_axis.set_xlabel("Grazing Angle [deg.]")
+    mp_crossings = crossings.loc[crossings["Type"].str.contains("MP")]
+    bs_crossings = crossings.loc[crossings["Type"].str.contains("BS")]
 
-    image_axis.margins(0)
+    print("Creating figure")
+    fig, image_axes = plt.subplots(1, 2, sharey=True)
 
+    bins = (
+        np.arange(0, 90, degrees_bin_size),
+        np.arange(0, crossings[y_variable].max(), y_bin_size),
+    )
+
+    for image_axis, crossings in zip(image_axes, [bs_crossings, mp_crossings]):
+
+        heatmap, x_edges, y_edges = np.histogram2d(
+            crossings["Grazing Angle (deg.)"], crossings[y_variable], bins=bins
+        )
+
+        extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]]
+
+        image = image_axis.imshow(
+            heatmap.T, extent=extent, origin="lower", norm="log", aspect="auto"
+        )
+
+        ax1_divider = make_axes_locatable(image_axis)
+        cax = ax1_divider.append_axes("right", size="5%", pad="2%")
+
+        fig.colorbar(image, cax=cax, label="Num. Crossings")
+
+        image_axis.set_ylabel(y_label)
+        image_axis.set_xlabel("Grazing Angle [deg.]")
+
+        image_axis.margins(0)
 
     plt.show()
 
 
 def Get_Crossing_Width(row):
-    return (row["End Time"] - row["Start Time"]).total_seconds() / 60 # minutes
-
-
-# Functions to use pandas' apply with parallelisation
-def Parallelise(data, function, number_of_processes):
-    data_splits = np.array_split(data, number_of_processes)
-
-    with multiprocessing.Pool(number_of_processes) as pool:
-
-        data = pd.concat(pool.map(function, data_splits))
-
-    return data
-
-
-def Apply_Function_To_Subset(function, data_subset):
-    return data_subset.apply(function, axis=1)
-
-
-def Parallelised_Apply(data, function, number_of_processes):
-    return Parallelise(data, functools.partial(Apply_Function_To_Subset, function), number_of_processes)
+    return (row["End Time"] - row["Start Time"]).total_seconds() / 60  # minutes
 
 
 if __name__ == "__main__":

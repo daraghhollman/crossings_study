@@ -4,6 +4,7 @@ Script to plot the width of a BS crossing interval to the angle the entry trajec
 
 import datetime as dt
 
+from hermpy.utils import Constants
 import hermpy.trajectory as traj
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,6 +16,7 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 def main():
 
     normalise_by_spacecraft_speed = True
+    use_radii = False
 
     # Load the grazing angles
     print("Loading grazing angles...")
@@ -30,6 +32,9 @@ def main():
         t.total_seconds() / 60
         for t in (crossings["End Time"] - crossings["Start Time"]).tolist()
     ]  # minutes
+
+    large_crossings = crossings.loc[crossings["dt"] > 100]
+    print(large_crossings.iloc[0])
 
     if normalise_by_spacecraft_speed:
 
@@ -69,6 +74,10 @@ def main():
         degrees_bin_size = 2
         y_bin_size = 200  # km
 
+        if use_radii:
+            crossings["distance"] /= Constants.MERCURY_RADIUS_KM
+            y_bin_size = 0.05  # R
+
     else:
         y_label = "Crossing Interval Length [minutes]"
         y_variable = "dt"
@@ -101,7 +110,7 @@ def main():
         extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]]
 
         image = image_axis.imshow(
-            heatmap.T, extent=extent, origin="lower", norm="log", aspect="auto"
+            heatmap.T, extent=extent, origin="lower", aspect="auto"
         )
 
         ax1_divider = make_axes_locatable(image_axis)

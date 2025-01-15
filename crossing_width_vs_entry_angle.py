@@ -17,6 +17,7 @@ def main():
 
     normalise_by_spacecraft_speed = True
     use_radii = False
+    normalise_by_sim = True
 
     # Load the grazing angles
     print("Loading grazing angles...")
@@ -32,9 +33,6 @@ def main():
         t.total_seconds() / 60
         for t in (crossings["End Time"] - crossings["Start Time"]).tolist()
     ]  # minutes
-
-    large_crossings = crossings.loc[crossings["dt"] > 100]
-    print(large_crossings.iloc[0])
 
     if normalise_by_spacecraft_speed:
 
@@ -101,22 +99,39 @@ def main():
         np.arange(0, crossings[y_variable].max(), y_bin_size),
     )
 
-    for image_axis, crossings in zip(image_axes, [bs_crossings, mp_crossings]):
+    for i, (image_axis, crossings) in enumerate(zip(image_axes, [bs_crossings, mp_crossings])):
 
         heatmap, x_edges, y_edges = np.histogram2d(
             crossings["Grazing Angle (deg.)"], crossings[y_variable], bins=bins
         )
 
+        if normalise_by_sim:
+            # Load sim data
+
+            if i == 0:
+                sim_grazing_angles = np.loadtxt(
+                    "/home/daraghhollman/Main/Work/mercury/DataSets/expected_winslow_bow_shock_grazing_angles.txt"
+                )
+
+            else:
+                sim_grazing_angles = np.loadtxt(
+                    "/home/daraghhollman/Main/Work/mercury/DataSets/expected_winslow_magnetopause_grazing_angles.txt"
+                )
+
+            sim_histogram, _ = np.histogram(sim_grazing_angles, bins=bins[0])
+
+            heatmap /= sim_histogram[:, None]
+
         extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]]
 
         image = image_axis.imshow(
-            heatmap.T, extent=extent, origin="lower", aspect="auto"
+            heatmap.T, extent=extent, origin="lower", aspect="auto", norm="log"
         )
 
         ax1_divider = make_axes_locatable(image_axis)
         cax = ax1_divider.append_axes("right", size="5%", pad="2%")
 
-        fig.colorbar(image, cax=cax, label="Num. Crossings")
+        fig.colorbar(image, cax=cax, label=("Num. Crossings" if not normalise_by_sim else "Num. Crossings, normalised by expected crossing grazing angles"))
 
         image_axis.set_ylabel(y_label)
         image_axis.set_xlabel("Grazing Angle [deg.]")
